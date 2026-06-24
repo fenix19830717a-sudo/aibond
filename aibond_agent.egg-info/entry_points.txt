@@ -1,2 +1,0 @@
-[console_scripts]
-aibond-agent = aibond_agent.cli:main
