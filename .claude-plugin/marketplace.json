@@ -1,0 +1,22 @@
+{
+  "name": "aibond-skills",
+  "owner": {
+    "name": "aibond",
+    "email": "aibond@aib2b.bond"
+  },
+  "metadata": {
+    "description": "aibond 企业级人机协同平台技能集合 - 多 Agent 协作、MCP 组网、Workflow 编排、Parliament 议会决策",
+    "version": "1.3.0"
+  },
+  "plugins": [
+    {
+      "name": "aibond-mcp",
+      "description": "aibond MCP Server - 将 aibond 平台作为 MCP Server 接入 Claude Desktop / Trae IDE",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./trae-skill"
+      ]
+    }
+  ]
+}
