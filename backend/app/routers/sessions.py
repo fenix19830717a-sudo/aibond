@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models.models import Session, SessionMember, Message, Group, GroupMember, Agent, User
-from app.security import rate_limit
+from app.security import rate_limit, get_current_actor
 from app.websocket.manager import ws_manager
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -19,8 +19,6 @@ class CreateSessionRequest(BaseModel):
     group_id: str = Field(..., min_length=1)
     title: str = Field(..., min_length=1, max_length=200)
     description: str = Field("", max_length=500)
-    assigner_type: str = Field(..., pattern=r"^(user|agent)$")
-    assigner_id: str = Field(..., min_length=1)
     assignee_ids: list[str] = Field(default_factory=list)
     priority: str = Field("normal", pattern=r"^(low|normal|high|urgent)$")
     context: dict | None = None
@@ -29,8 +27,6 @@ class CreateSessionRequest(BaseModel):
 
 class SessionMessageRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
-    sender_type: str = Field(..., pattern=r"^(user|agent)$")
-    sender_id: str = Field(..., min_length=1)
     content: str = Field(..., min_length=1, max_length=10000)
     msg_type: str = Field("text", pattern=r"^(text|file|system|task_assign|task_complete|task_cancel|task_update)$")
     metadata: dict | None = None
@@ -41,8 +37,10 @@ class UpdateSessionStatusRequest(BaseModel):
 
 
 @router.post("/")
-async def create_session(req: CreateSessionRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def create_session(req: CreateSessionRequest, request: Request, actor: tuple[str, str] = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
     await rate_limit(request, limit=20, window=60)
+
+    actor_id, actor_type = actor
 
     # Verify group exists
     group_result = await db.execute(select(Group).where(Group.id == req.group_id))
@@ -56,8 +54,8 @@ async def create_session(req: CreateSessionRequest, request: Request, db: AsyncS
         description=req.description,
         status="active",
         priority=req.priority,
-        assigner_id=req.assigner_id,
-        assigner_type=req.assigner_type,
+        assigner_id=actor_id,
+        assigner_type=actor_type,
         assignee_ids=req.assignee_ids,
         context=req.context or {},
         parent_session_id=req.parent_session_id or "",
@@ -67,7 +65,7 @@ async def create_session(req: CreateSessionRequest, request: Request, db: AsyncS
     await db.refresh(session)
 
     # Add members: assigner + assignees
-    members_to_add = [(req.assigner_type, req.assigner_id, "lead")]
+    members_to_add = [(actor_type, actor_id, "lead")]
     for aid in req.assignee_ids:
         members_to_add.append(("agent", aid, "participant"))
 
@@ -89,7 +87,7 @@ async def create_session(req: CreateSessionRequest, request: Request, db: AsyncS
         sender_type="system",
         msg_type="system",
         content=f"任务会话已创建: {req.title}",
-        msg_metadata={"event": "session_created", "assigner": req.assigner_id, "assignees": req.assignee_ids},
+        msg_metadata={"event": "session_created", "assigner": actor_id, "assignees": req.assignee_ids},
     )
     db.add(sys_msg)
     await db.commit()
@@ -113,9 +111,19 @@ async def create_session(req: CreateSessionRequest, request: Request, db: AsyncS
 async def list_sessions(
     group_id: Optional[str] = None,
     status: Optional[str] = None,
+    actor: tuple[str, str] = Depends(get_current_actor),
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(Session).where(Session.status != "cancelled")
+    actor_id, actor_type = actor
+
+    # Only return sessions where the actor is a member
+    query = select(Session).join(
+        SessionMember, Session.id == SessionMember.session_id
+    ).where(
+        SessionMember.member_type == actor_type,
+        SessionMember.member_id == actor_id,
+        Session.status != "cancelled"
+    )
     if group_id:
         query = query.where(Session.group_id == group_id)
     if status:
@@ -144,11 +152,24 @@ async def list_sessions(
 
 
 @router.get("/{session_id}")
-async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
+async def get_session(session_id: str, actor: tuple[str, str] = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
+    actor_id, actor_type = actor
+
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Verify actor is a member of this session
+    member_result = await db.execute(
+        select(SessionMember).where(
+            SessionMember.session_id == session_id,
+            SessionMember.member_type == actor_type,
+            SessionMember.member_id == actor_id,
+        )
+    )
+    if not member_result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Not a member of this session")
 
     # Get members
     members_result = await db.execute(select(SessionMember).where(SessionMember.session_id == session_id))
@@ -217,8 +238,10 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{session_id}/messages")
-async def send_session_message(req: SessionMessageRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def send_session_message(req: SessionMessageRequest, request: Request, actor: tuple[str, str] = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
     await rate_limit(request, limit=60, window=60)
+
+    actor_id, actor_type = actor
 
     # Verify session exists and is active
     session_result = await db.execute(select(Session).where(Session.id == req.session_id))
@@ -232,8 +255,8 @@ async def send_session_message(req: SessionMessageRequest, request: Request, db:
     member_result = await db.execute(
         select(SessionMember).where(
             SessionMember.session_id == req.session_id,
-            SessionMember.member_type == req.sender_type,
-            SessionMember.member_id == req.sender_id,
+            SessionMember.member_type == actor_type,
+            SessionMember.member_id == actor_id,
         )
     )
     if not member_result.scalar_one_or_none():
@@ -243,9 +266,9 @@ async def send_session_message(req: SessionMessageRequest, request: Request, db:
         id=str(uuid.uuid4()),
         group_id=session.group_id,
         session_id=req.session_id,
-        sender_type=req.sender_type,
-        sender_user_id=req.sender_id if req.sender_type == "user" else None,
-        sender_agent_id=req.sender_id if req.sender_type == "agent" else None,
+        sender_type=actor_type,
+        sender_user_id=actor_id if actor_type == "user" else None,
+        sender_agent_id=actor_id if actor_type == "agent" else None,
         msg_type=req.msg_type,
         content=req.content,
         msg_metadata=req.metadata or {},
@@ -257,12 +280,12 @@ async def send_session_message(req: SessionMessageRequest, request: Request, db:
 
     # Get sender name
     sender_name = ""
-    if req.sender_type == "user":
-        user_result = await db.execute(select(User).where(User.id == req.sender_id))
+    if actor_type == "user":
+        user_result = await db.execute(select(User).where(User.id == actor_id))
         user = user_result.scalar_one_or_none()
         sender_name = user.display_name or user.username if user else "Unknown"
     else:
-        agent_result = await db.execute(select(Agent).where(Agent.id == req.sender_id))
+        agent_result = await db.execute(select(Agent).where(Agent.id == actor_id))
         agent = agent_result.scalar_one_or_none()
         sender_name = agent.name if agent else "Unknown"
 
@@ -272,7 +295,7 @@ async def send_session_message(req: SessionMessageRequest, request: Request, db:
         "id": message.id,
         "session_id": req.session_id,
         "sender_type": message.sender_type,
-        "sender_id": req.sender_id,
+        "sender_id": actor_id,
         "sender_name": sender_name,
         "msg_type": message.msg_type,
         "content": message.content,
@@ -300,11 +323,24 @@ async def send_session_message(req: SessionMessageRequest, request: Request, db:
 
 
 @router.post("/{session_id}/status")
-async def update_session_status(session_id: str, req: UpdateSessionStatusRequest, db: AsyncSession = Depends(get_db)):
+async def update_session_status(session_id: str, req: UpdateSessionStatusRequest, actor: tuple[str, str] = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
+    actor_id, actor_type = actor
+
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Verify actor is a member of this session
+    member_result = await db.execute(
+        select(SessionMember).where(
+            SessionMember.session_id == session_id,
+            SessionMember.member_type == actor_type,
+            SessionMember.member_id == actor_id,
+        )
+    )
+    if not member_result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Not a member of this session")
 
     session.status = req.status
     if req.status == "completed":

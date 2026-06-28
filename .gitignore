@@ -8,6 +8,7 @@ __pycache__/
 dist/
 build/
 venv/
+.venv/
 .env
 *.db
 
@@ -36,9 +37,20 @@ htmlcov/
 
 # Temporary
 *.tmp
+c:\Users\cc\.trae-cn\work\*
 
 # Binary executables
 *.exe
 
 # Cloudflare tunnel
 cloudflared*
+
+# Design docs (not needed in repo)
+aibond-design-concepts/
+aib2b-review-2026-06/
+aib2b_probe_report.txt
+
+# Python cache
+*.pyc
+.mypy_cache/
+.ruff_cache/

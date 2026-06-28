@@ -6,8 +6,8 @@ import uuid
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models.models import Message, Group, User, Agent
-from app.security import rate_limit, sanitize_text
+from app.models.models import Message, Group, GroupMember, User, Agent
+from app.security import get_current_user_id, get_current_actor, rate_limit, sanitize_text
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -20,14 +20,34 @@ class SendMessageRequest(BaseModel):
     metadata: dict | None = None
 
 @router.post("/")
-async def send_message(req: SendMessageRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def send_message(req: SendMessageRequest, request: Request, actor: tuple = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
+    actor_id, actor_type = actor
+
     # Rate limit: 60 messages per minute per IP
     await rate_limit(request, limit=60, window=60)
+
+    # P0 防伪造：sender_id 必须与当前登录实体一致
+    if req.sender_type == "user" and req.sender_id != actor_id:
+        raise HTTPException(status_code=403, detail="Cannot send as another user")
+    if req.sender_type == "agent" and req.sender_id != actor_id:
+        raise HTTPException(status_code=403, detail="Cannot send as another agent")
 
     # Verify group exists
     group_result = await db.execute(select(Group).where(Group.id == req.group_id))
     if not group_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Group not found")
+
+    # P0 鉴权：验证当前实体是群组成员（支持 user 和 agent）
+    if actor_type == "user":
+        membership = await db.execute(
+            select(GroupMember).where(GroupMember.group_id == req.group_id, GroupMember.user_id == actor_id)
+        )
+    else:
+        membership = await db.execute(
+            select(GroupMember).where(GroupMember.group_id == req.group_id, GroupMember.agent_id == actor_id)
+        )
+    if not membership.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Not a member of this group")
 
     # Verify sender exists
     if req.sender_type == "user":

@@ -1,13 +1,19 @@
-"""Security utilities: rate limiting, login lockout, input sanitization."""
+"""Security utilities: rate limiting, login lockout, input sanitization, JWT auth."""
 
 import time
 import re
 import html
 from typing import Optional
-from fastapi import Request, HTTPException, status
+from datetime import datetime, timezone, timedelta
+from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+import jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
+from app.database import get_db
+from app.models.models import Agent
 
 # ── Rate Limiting (in-memory, production use Redis) ──
 _rate_limit_store: dict = {}  # ip -> [(timestamp, count)]
@@ -109,3 +115,78 @@ async def get_current_user_token(credentials: HTTPAuthorizationCredentials = Non
             headers={"WWW-Authenticate": "Bearer"},
         )
     return credentials.credentials
+
+
+async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security_bearer)) -> str:
+    """解码 JWT 并返回 user_id。无效 token 抛出 401。"""
+    token = await get_current_user_token(credentials)
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token: no sub")
+        return user_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_current_actor(
+    credentials: HTTPAuthorizationCredentials = Depends(security_bearer),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[str, str]:
+    """双认证：JWT (user) 或 API Key (agent)。返回 (actor_id, actor_type)。"""
+    token = await get_current_user_token(credentials)
+
+    # 1. 尝试 JWT 解码（用户）
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        if user_id:
+            return (user_id, "user")
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        pass
+
+    # 2. 尝试 Agent API Key (abk_xxx)
+    if token.startswith("abk_"):
+        result = await db.execute(
+            select(Agent).where(Agent.api_key == token, Agent.is_active == True)
+        )
+        agent = result.scalar_one_or_none()
+        if agent:
+            return (agent.id, "agent")
+
+    raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+
+# ── JWT Refresh Token ──
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+
+
+def create_refresh_token(user_id: str) -> str:
+    """生成有效期 7 天的 refresh token。"""
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    payload = {
+        "sub": user_id,
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "type": "refresh",
+    }
+    refresh_secret = settings.SECRET_KEY + "_refresh"
+    return jwt.encode(payload, refresh_secret, algorithm="HS256")
+
+
+def verify_refresh_token(token: str) -> Optional[str]:
+    """验证 refresh token 并返回 user_id。无效或过期返回 None。"""
+    try:
+        refresh_secret = settings.SECRET_KEY + "_refresh"
+        payload = jwt.decode(token, refresh_secret, algorithms=["HS256"])
+        if payload.get("type") != "refresh":
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        return user_id
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None

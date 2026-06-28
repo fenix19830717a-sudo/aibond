@@ -1,15 +1,32 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, theme } from 'antd';
+import { ConfigProvider, theme, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import MainLayout from './components/MainLayout';
 import Login from './pages/Login';
-import Chat from './pages/Chat';
-import Groups from './pages/Groups';
-import Workflow from './pages/Workflow';
-import WorkflowEditor from './pages/WorkflowEditor';
-import Agents from './pages/Agents';
 import { useAuthStore } from './store/authStore';
+
+// Lazy load pages for code splitting
+const Chat = lazy(() => import('./pages/Chat'));
+const Groups = lazy(() => import('./pages/Groups'));
+const GroupDetail = lazy(() => import('./pages/GroupDetail'));
+const Agents = lazy(() => import('./pages/Agents'));
+const Workflow = lazy(() => import('./pages/Workflow'));
+const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'));
+const Social = lazy(() => import('./pages/Social'));
+const ScheduledTasks = lazy(() => import('./pages/ScheduledTasks'));
+const Parliament = lazy(() => import('./pages/Parliament'));
+const ParliamentDetail = lazy(() => import('./pages/ParliamentDetail'));
+const Tasks = lazy(() => import('./pages/Tasks'));
+const AuditLog = lazy(() => import('./pages/AuditLog'));
+const SkillsMarket = lazy(() => import('./pages/SkillsMarket'));
+const TeamTemplates = lazy(() => import('./pages/TeamTemplates'));
+
+const PageLoader = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+    <Spin size="large" />
+  </div>
+);
 
 const App: React.FC = () => {
   const { token } = useAuthStore();
@@ -29,11 +46,20 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/login" element={token ? <Navigate to="/" /> : <Login />} />
           <Route path="/" element={token ? <MainLayout /> : <Navigate to="/login" />}>
-            <Route index element={<Chat />} />
-            <Route path="groups" element={<Groups />} />
-            <Route path="agents" element={<Agents />} />
-            <Route path="workflows" element={<Workflow />} />
-            <Route path="workflows/:id" element={<WorkflowEditor />} />
+            <Route index element={<Suspense fallback={<PageLoader />}><Chat /></Suspense>} />
+            <Route path="groups" element={<Suspense fallback={<PageLoader />}><Groups /></Suspense>} />
+            <Route path="groups/:groupId" element={<Suspense fallback={<PageLoader />}><GroupDetail /></Suspense>} />
+            <Route path="agents" element={<Suspense fallback={<PageLoader />}><Agents /></Suspense>} />
+            <Route path="social" element={<Suspense fallback={<PageLoader />}><Social /></Suspense>} />
+            <Route path="workflows" element={<Suspense fallback={<PageLoader />}><Workflow /></Suspense>} />
+            <Route path="workflows/:id" element={<Suspense fallback={<PageLoader />}><WorkflowEditor /></Suspense>} />
+            <Route path="scheduled" element={<Suspense fallback={<PageLoader />}><ScheduledTasks /></Suspense>} />
+            <Route path="tasks" element={<Suspense fallback={<PageLoader />}><Tasks /></Suspense>} />
+            <Route path="parliament" element={<Suspense fallback={<PageLoader />}><Parliament /></Suspense>} />
+            <Route path="parliament/:id" element={<Suspense fallback={<PageLoader />}><ParliamentDetail /></Suspense>} />
+            <Route path="audit" element={<Suspense fallback={<PageLoader />}><AuditLog /></Suspense>} />
+            <Route path="skills" element={<Suspense fallback={<PageLoader />}><SkillsMarket /></Suspense>} />
+            <Route path="templates" element={<Suspense fallback={<PageLoader />}><TeamTemplates /></Suspense>} />
           </Route>
         </Routes>
       </BrowserRouter>

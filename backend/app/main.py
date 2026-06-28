@@ -4,13 +4,17 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import os
+import jwt
 
 from app.config import settings
 from app.database import init_db
-from app.routers import auth, agents, groups, messages, workflows, sessions, files, offline
+from app.routers import auth, agents, groups, messages, workflows, sessions, files, offline, audit, social, templates, scheduled_tasks, tasks, resources, reviews, hub, parliament, mcp_router
 from app.websocket.manager import ws_manager
 from app.websocket.agent_handler import handle_agent_websocket
 from app.tunnel import TunnelManager
+from app.mcp.server import init_mcp_server
+from app.mcp.registry import global_registry
+from app.mcp.client import global_mcp_client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,6 +35,11 @@ async def lifespan(app: FastAPI):
 
     print("aibond server started")
     print(f"DEBUG mode: {settings.DEBUG}")
+
+    # 初始化 MCP Server（注入 registry 和 client）
+    init_mcp_server(global_registry, global_mcp_client)
+    print("MCP server initialized")
+
     if settings.PUBLIC_URL:
         # Convert https to wss for WebSocket connections
         wss_url = settings.PUBLIC_URL.replace("https://", "wss://")
@@ -48,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     description="Enterprise Human-AI Collaboration Platform",
-    version="0.4.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -60,7 +69,15 @@ async def security_headers(request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    # In production, add CSP: response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; "
+        "img-src 'self' data:"
+    )
+    if not settings.DEBUG:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
     return response
 
 # CORS - strict origin validation
@@ -97,6 +114,16 @@ app.include_router(workflows.router)
 app.include_router(sessions.router)
 app.include_router(files.router)
 app.include_router(offline.router)
+app.include_router(audit.router)
+app.include_router(social.router)
+app.include_router(templates.router)
+app.include_router(scheduled_tasks.router)
+app.include_router(tasks.router)
+app.include_router(resources.router)
+app.include_router(reviews.router)
+app.include_router(hub.router)
+app.include_router(parliament.router)
+app.include_router(mcp_router.router)
 
 @app.get("/api/health")
 async def health():
@@ -128,9 +155,21 @@ async def sdk_info():
     }
 
 @app.websocket("/ws/user/{user_id}")
-async def user_websocket(websocket: WebSocket, user_id: str):
-    # User WebSocket currently accepts any connection with user_id in path
-    # In production, validate JWT token during handshake
+async def user_websocket(websocket: WebSocket, user_id: str, token: str = Query(...)):
+    # Validate JWT token during handshake
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        token_user_id = payload.get("sub")
+        if not token_user_id or token_user_id != user_id:
+            await websocket.close(code=4001, reason="Invalid token: user_id mismatch")
+            return
+    except jwt.ExpiredSignatureError:
+        await websocket.close(code=4001, reason="Token expired")
+        return
+    except jwt.InvalidTokenError:
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
     await ws_manager.connect_user(user_id, websocket)
     try:
         while True:

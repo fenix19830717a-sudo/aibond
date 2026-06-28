@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, exists
 from typing import Optional
 import uuid
 
 from app.database import get_db
 from app.models.models import Group, GroupMember, User, Agent
-from app.security import rate_limit
+from app.security import get_current_user_id, rate_limit
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
@@ -22,11 +22,15 @@ class AddMemberRequest(BaseModel):
     role: str = Field("member", pattern=r"^(owner|lead|admin|member|viewer)$")
 
 @router.post("/")
-async def create_group(req: CreateGroupRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def create_group(req: CreateGroupRequest, request: Request, uid: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     await rate_limit(request, limit=20, window=60)
 
+    # 强制 owner_id = 当前登录用户，防止伪造身份
+    if req.owner_id != uid:
+        raise HTTPException(status_code=403, detail="Cannot create group for another user")
+
     # Verify owner exists
-    owner_result = await db.execute(select(User).where(User.id == req.owner_id))
+    owner_result = await db.execute(select(User).where(User.id == uid))
     if not owner_result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Owner not found")
 
@@ -34,7 +38,7 @@ async def create_group(req: CreateGroupRequest, request: Request, db: AsyncSessi
         id=str(uuid.uuid4()),
         name=req.name,
         description=req.description,
-        owner_id=req.owner_id,
+        owner_id=uid,
     )
     db.add(group)
     await db.commit()
@@ -44,7 +48,7 @@ async def create_group(req: CreateGroupRequest, request: Request, db: AsyncSessi
     member = GroupMember(
         id=str(uuid.uuid4()),
         group_id=group.id,
-        user_id=req.owner_id,
+        user_id=uid,
         role="admin",
     )
     db.add(member)
@@ -53,8 +57,15 @@ async def create_group(req: CreateGroupRequest, request: Request, db: AsyncSessi
     return {"id": group.id, "name": group.name, "description": group.description, "owner_id": group.owner_id}
 
 @router.get("/")
-async def list_groups(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Group).where(Group.is_active == True))
+async def list_groups(uid: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    # 仅返回当前用户是 owner 或成员的群组
+    result = await db.execute(
+        select(Group).where(
+            Group.is_active == True,
+            (Group.owner_id == uid) |
+            exists().where(GroupMember.group_id == Group.id, GroupMember.user_id == uid)
+        )
+    )
     groups = result.scalars().all()
 
     return [{
@@ -66,11 +77,21 @@ async def list_groups(db: AsyncSession = Depends(get_db)):
     } for g in groups]
 
 @router.get("/{group_id}")
-async def get_group(group_id: str, db: AsyncSession = Depends(get_db)):
+async def get_group(group_id: str, uid: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Group).where(Group.id == group_id))
     group = result.scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+
+    # 鉴权：验证当前用户是群组成员
+    membership = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == uid
+        )
+    )
+    if not membership.scalar_one_or_none() and group.owner_id != uid:
+        raise HTTPException(status_code=403, detail="Not a member of this group")
 
     # Get members
     members_result = await db.execute(
@@ -100,13 +121,24 @@ async def get_group(group_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 @router.post("/{group_id}/members")
-async def add_member(group_id: str, req: AddMemberRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def add_member(group_id: str, req: AddMemberRequest, request: Request, uid: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     await rate_limit(request, limit=30, window=60)
 
-    # Verify group exists
+    # 鉴权：验证当前用户是 admin/owner
     group_result = await db.execute(select(Group).where(Group.id == group_id))
-    if not group_result.scalar_one_or_none():
+    group = group_result.scalar_one_or_none()
+    if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+
+    member_check = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == uid,
+            GroupMember.role.in_(["admin", "owner"])
+        )
+    )
+    if not member_check.scalar_one_or_none() and group.owner_id != uid:
+        raise HTTPException(status_code=403, detail="Only admin/owner can add members")
 
     # Verify member exists
     if req.member_type == "user":
@@ -135,6 +167,7 @@ async def get_messages(
     group_id: str,
     limit: int = 50,
     offset: int = 0,
+    uid: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     # Validate pagination params
@@ -142,6 +175,21 @@ async def get_messages(
         limit = 50
     if offset < 0:
         offset = 0
+
+    # 鉴权：验证当前用户是群组成员
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    membership = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == uid
+        )
+    )
+    if not membership.scalar_one_or_none() and group.owner_id != uid:
+        raise HTTPException(status_code=403, detail="Not a member of this group")
 
     from app.models.models import Message
     result = await db.execute(

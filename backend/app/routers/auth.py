@@ -12,7 +12,7 @@ from app.config import settings
 from app.models.models import User
 from app.security import (
     rate_limit, check_login_lockout, record_login_failure, record_login_success,
-    validate_username, validate_password
+    validate_username, validate_password, create_refresh_token, verify_refresh_token
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -28,6 +28,9 @@ class LoginRequest(BaseModel):
 
 class TokenRequest(BaseModel):
     token: str
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -78,7 +81,8 @@ async def register(req: RegisterRequest, request: Request, db: AsyncSession = De
     await db.refresh(user)
 
     token = create_access_token({"sub": user.id, "username": user.username})
-    return {"token": token, "user": {"id": user.id, "username": user.username, "display_name": user.display_name}}
+    refresh_token = create_refresh_token(user.id)
+    return {"token": token, "refresh_token": refresh_token, "user": {"id": user.id, "username": user.username, "display_name": user.display_name}}
 
 @router.post("/login")
 async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
@@ -105,7 +109,8 @@ async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(
 
     record_login_success(req.username)
     token = create_access_token({"sub": user.id, "username": user.username})
-    return {"token": token, "user": {"id": user.id, "username": user.username, "display_name": user.display_name}}
+    refresh_token = create_refresh_token(user.id)
+    return {"token": token, "refresh_token": refresh_token, "user": {"id": user.id, "username": user.username, "display_name": user.display_name}}
 
 @router.post("/me")
 async def get_current_user(req: TokenRequest, db: AsyncSession = Depends(get_db)):
@@ -133,3 +138,22 @@ async def get_current_user(req: TokenRequest, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=403, detail="User is disabled")
 
     return {"id": user.id, "username": user.username, "display_name": user.display_name, "role": user.role}
+
+@router.post("/refresh")
+async def refresh_token(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    """Refresh access token using a valid refresh token."""
+    user_id = verify_refresh_token(req.refresh_token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    # Verify user exists and is active
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="User is disabled")
+
+    new_access_token = create_access_token({"sub": user.id, "username": user.username})
+    new_refresh_token = create_refresh_token(user.id)
+    return {"token": new_access_token, "refresh_token": new_refresh_token}

@@ -8,6 +8,7 @@ import shutil
 
 from app.database import get_db
 from app.models.models import File as FileModel, Group, Session as SessionModel
+from app.security import get_current_actor
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -19,10 +20,11 @@ async def upload_file(
     file: UploadFile,
     group_id: str = "",
     session_id: str = "",
-    uploader_type: str = "user",
-    uploader_id: str = "",
+    actor: tuple[str, str] = Depends(get_current_actor),
     db: AsyncSession = Depends(get_db),
 ):
+    actor_id, actor_type = actor
+
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     file_id = str(uuid.uuid4())
     ext = os.path.splitext(file.filename)[1] if file.filename else ""
@@ -39,8 +41,8 @@ async def upload_file(
         original_name=file.filename or "unnamed",
         file_size=len(content),
         mime_type=file.content_type or "",
-        uploader_type=uploader_type,
-        uploader_id=uploader_id,
+        uploader_type=actor_type,
+        uploader_id=actor_id,
         group_id=group_id or None,
         session_id=session_id or None,
         storage_path=storage_path,
@@ -60,9 +62,14 @@ async def upload_file(
 async def list_files(
     group_id: str = None,
     session_id: str = None,
+    actor: tuple[str, str] = Depends(get_current_actor),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(FileModel)
+    actor_id, actor_type = actor
+    query = select(FileModel).where(
+        FileModel.uploader_id == actor_id,
+        FileModel.uploader_type == actor_type,
+    )
     if group_id:
         query = query.where(FileModel.group_id == group_id)
     if session_id:
@@ -84,7 +91,7 @@ async def list_files(
 
 
 @router.get("/{file_id}")
-async def download_file(file_id: str, db: AsyncSession = Depends(get_db)):
+async def download_file(file_id: str, actor: tuple[str, str] = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(FileModel).where(FileModel.id == file_id))
     file_record = result.scalar_one_or_none()
     if not file_record:

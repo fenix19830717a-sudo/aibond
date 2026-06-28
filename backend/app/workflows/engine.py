@@ -1,9 +1,16 @@
-"""Workflow execution engine - executes workflow definitions node by node."""
+"""Workflow execution engine - executes workflow definitions node by node.
 
+Supports 8 node types:
+    trigger, ai, human_review, condition, output, parallel, webhook, event_watcher
+"""
+
+import asyncio
 import operator
+import json
 from datetime import datetime, timezone
 from typing import Any
 
+import aiohttp
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,8 +40,8 @@ class WorkflowEngine:
         """Execute a workflow and return results.
 
         Loads the workflow definition, creates an instance, then executes
-        nodes sequentially following edges. Supports 5 node types:
-        trigger, ai, human_review, condition, output.
+        nodes sequentially following edges. Supports 8 node types:
+        trigger, ai, human_review, condition, output, parallel, webhook, event_watcher.
 
         Returns a dict with instance_id, status, and node_results.
         """
@@ -273,6 +280,202 @@ class WorkflowEngine:
                 "timestamp": timestamp,
             }
 
+        elif node_type == "parallel":
+            # Parallel multi-agent dispatch (Hermes Kanban pattern)
+            # Send tasks to multiple agents simultaneously via asyncio.gather
+            agent_ids = config.get("agent_ids", [])
+            task_prompts = config.get("task_prompts", {})
+            aggregate_by = config.get("aggregate_by", "summary")
+            task_title = config.get("title", "Parallel Task")
+
+            async def send_to_agent(aid: str) -> dict:
+                """Send a task_assign to a single agent within the parallel group."""
+                prompt = task_prompts.get(aid, config.get("prompt", ""))
+                assign_payload = {
+                    "type": "task_assign",
+                    "workflow_id": workflow_id,
+                    "instance_id": instance_id,
+                    "node_id": node_id,
+                    "title": task_title,
+                    "description": prompt,
+                    "priority": config.get("priority", "normal"),
+                    "context": context,
+                    "from_workflow": True,
+                }
+                await ws_manager.send_to_agent(aid, assign_payload)
+                return {"agent_id": aid, "prompt": prompt, "task_sent": True}
+
+            # Dispatch all tasks in parallel
+            gather_results = await asyncio.gather(
+                *[send_to_agent(aid) for aid in agent_ids],
+                return_exceptions=True,
+            )
+
+            # Collect results, handling any exceptions
+            results_list: list[dict] = []
+            for i, result in enumerate(gather_results):
+                if isinstance(result, Exception):
+                    results_list.append({
+                        "agent_id": agent_ids[i] if i < len(agent_ids) else "unknown",
+                        "error": str(result),
+                        "task_sent": False,
+                    })
+                else:
+                    results_list.append(result)
+
+            # Aggregate results based on the configured strategy
+            if aggregate_by == "vote":
+                # Simple majority vote on task_sent
+                success_count = sum(1 for r in results_list if r.get("task_sent"))
+                aggregated = (
+                    f"Vote: {success_count}/{len(results_list)} agents dispatched successfully"
+                )
+            elif aggregate_by == "merge":
+                aggregated = json.dumps(results_list, ensure_ascii=False)
+            else:
+                # Default: summary
+                aggregated = (
+                    f"Parallel dispatch: {len(results_list)} agents, "
+                    f"{len(agent_ids)} tasks sent"
+                )
+
+            return {
+                "node_id": node_id,
+                "node_type": "parallel",
+                "status": "completed",
+                "output": {
+                    "parallel_results": results_list,
+                    "aggregated": aggregated,
+                },
+                "timestamp": timestamp,
+            }
+
+        elif node_type == "webhook":
+            # Send HTTP request to an external URL
+            url = config.get("url", "")
+            method = config.get("method", "GET").upper()
+            body = config.get("body", {})
+            headers = config.get("headers", {})
+            timeout_sec = config.get("timeout", 30)
+
+            if not url:
+                return {
+                    "node_id": node_id,
+                    "node_type": "webhook",
+                    "status": "error",
+                    "message": "Webhook URL is required",
+                    "timestamp": timestamp,
+                }
+
+            try:
+                client_timeout = aiohttp.ClientTimeout(total=timeout_sec)
+                async with aiohttp.ClientSession(timeout=client_timeout) as session:
+                    if method == "POST":
+                        async with session.post(
+                            url, json=body, headers=headers
+                        ) as resp:
+                            response_text = await resp.text()
+                            status_code = resp.status
+                    elif method == "PUT":
+                        async with session.put(
+                            url, json=body, headers=headers
+                        ) as resp:
+                            response_text = await resp.text()
+                            status_code = resp.status
+                    elif method == "DELETE":
+                        async with session.delete(
+                            url, headers=headers
+                        ) as resp:
+                            response_text = await resp.text()
+                            status_code = resp.status
+                    elif method == "PATCH":
+                        async with session.patch(
+                            url, json=body, headers=headers
+                        ) as resp:
+                            response_text = await resp.text()
+                            status_code = resp.status
+                    else:
+                        # Default: GET
+                        async with session.get(
+                            url, headers=headers
+                        ) as resp:
+                            response_text = await resp.text()
+                            status_code = resp.status
+
+                # Try to parse JSON response
+                try:
+                    response_data = json.loads(response_text)
+                except (json.JSONDecodeError, TypeError):
+                    response_data = response_text
+
+                return {
+                    "node_id": node_id,
+                    "node_type": "webhook",
+                    "status": "completed",
+                    "output": {
+                        "status_code": status_code,
+                        "response": response_data,
+                        "url": url,
+                        "method": method,
+                    },
+                    "timestamp": timestamp,
+                }
+            except asyncio.TimeoutError:
+                return {
+                    "node_id": node_id,
+                    "node_type": "webhook",
+                    "status": "error",
+                    "message": f"Webhook request timed out after {timeout_sec}s: {url}",
+                    "timestamp": timestamp,
+                }
+            except aiohttp.ClientError as e:
+                return {
+                    "node_id": node_id,
+                    "node_type": "webhook",
+                    "status": "error",
+                    "message": f"Webhook request failed: {str(e)}",
+                    "timestamp": timestamp,
+                }
+            except Exception as e:
+                return {
+                    "node_id": node_id,
+                    "node_type": "webhook",
+                    "status": "error",
+                    "message": f"Webhook unexpected error: {str(e)}",
+                    "timestamp": timestamp,
+                }
+
+        elif node_type == "event_watcher":
+            # Monitor conditions and trigger actions (Hermes intelligent monitoring)
+            watch_type = config.get("watch_type", "message")
+            watch_key = config.get("watch_key", "")
+            condition = config.get("condition", {})
+            expected_value = config.get("expected_value", "")
+            action = config.get("action", "notify")
+
+            # Evaluate whether the watch condition is met
+            triggered = self._check_event_condition(
+                watch_type=watch_type,
+                condition=condition,
+                watch_key=watch_key,
+                expected_value=expected_value,
+                context=context,
+            )
+
+            return {
+                "node_id": node_id,
+                "node_type": "event_watcher",
+                "status": "completed",
+                "output": {
+                    "watch_type": watch_type,
+                    "triggered": triggered,
+                    "action": action,
+                    "condition": condition,
+                },
+                "condition_result": triggered,
+                "timestamp": timestamp,
+            }
+
         else:
             return {
                 "node_id": node_id,
@@ -302,12 +505,17 @@ class WorkflowEngine:
         adjacency: dict,
         edges_from_node: list[tuple[str, dict]],
     ) -> str | None:
-        """Determine the next node to execute based on edges."""
+        """Determine the next node to execute based on edges.
+
+        For condition and event_watcher nodes, routes based on the
+        condition_result (true/false branch). For all other node types
+        (including parallel and webhook), follows the first outgoing edge.
+        """
         if not edges_from_node:
             return None
 
-        if node_type == "condition":
-            # For condition nodes, route based on the condition result
+        if node_type in ("condition", "event_watcher"):
+            # For condition/event_watcher nodes, route based on the result
             condition_result = step_result.get("condition_result", False)
             for target_id, edge_data in edges_from_node:
                 edge_handle = edge_data.get("data", {}).get("handleId", "")
@@ -319,7 +527,7 @@ class WorkflowEngine:
             # Fallback: return first edge target
             return edges_from_node[0][0] if edges_from_node else None
 
-        # For all other node types, follow the first outgoing edge
+        # For parallel, webhook, and all other node types, follow the first outgoing edge
         return edges_from_node[0][0] if edges_from_node else None
 
     def _evaluate_condition(self, expression: str, context: dict) -> bool:
@@ -376,3 +584,87 @@ class WorkflowEngine:
             else:
                 return key  # Return raw key if not found
         return value
+
+    def _check_event_condition(
+        self,
+        watch_type: str,
+        condition,  # Can be dict or str
+        context: dict,
+        watch_key: str = "",
+        expected_value: str = "",
+    ) -> bool:
+        """Evaluate whether an event watcher condition is met.
+
+        Args:
+            watch_type: Type of watch - "message", "agent_status", "task_status"
+            condition: Dict with condition parameters, or str operator (==, !=, >, <, etc.)
+            context: Current workflow context
+            watch_key: Key to watch in context
+            expected_value: Expected value for comparison
+
+        Returns:
+            True if the condition is triggered, False otherwise
+        """
+        # Normalize condition: if it's a string, treat as simple comparison
+        if isinstance(condition, str):
+            condition = {"operator": condition, "value": expected_value}
+
+        if watch_type == "message":
+            # Check for message-related conditions
+            if watch_key and expected_value:
+                # Use watch_key and expected_value for comparison
+                op = condition.get("operator", "contains")
+                ctx_value = self._resolve_context_value(watch_key, context)
+                if op == "contains":
+                    return expected_value.lower() in str(ctx_value).lower()
+                elif op in _CONDITION_OPS:
+                    return _CONDITION_OPS[op](ctx_value, expected_value)
+                return ctx_value == expected_value
+
+            expected_text = condition.get("contains", "") if isinstance(condition, dict) else ""
+            if expected_text:
+                # Search through all context values for the expected text
+                for key, value in context.items():
+                    if isinstance(value, dict):
+                        value_str = json.dumps(value, ensure_ascii=False)
+                    else:
+                        value_str = str(value)
+                    if expected_text.lower() in value_str.lower():
+                        return True
+                return False
+            # If no specific condition, check if any message data exists in context
+            return any(
+                isinstance(v, dict) and v.get("triggered")
+                for v in context.values()
+            )
+
+        elif watch_type == "agent_status":
+            # Check agent status conditions
+            if isinstance(condition, dict):
+                expected_status = condition.get("status", expected_value)
+            else:
+                expected_status = expected_value
+            if expected_status:
+                for key, value in context.items():
+                    if isinstance(value, dict) and value.get("status") == expected_status:
+                        return True
+                return False
+            return True  # Default: any agent status change triggers
+
+        elif watch_type == "task_status":
+            # Check task status conditions
+            if isinstance(condition, dict):
+                expected_status = condition.get("status", expected_value)
+            else:
+                expected_status = expected_value
+            if expected_status:
+                for key, value in context.items():
+                    if isinstance(value, dict) and value.get("status") == expected_status:
+                        return True
+                    if isinstance(value, dict) and value.get("task_status") == expected_status:
+                        return True
+                return False
+            return True  # Default: any task status change triggers
+
+        # Unknown watch_type: default to False
+        return False

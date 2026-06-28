@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons';
 import type { Session } from '../../store/chatStore';
 import { api } from '../../api';
+import { useAuthStore } from '../../store/authStore';
 import {
   roleColorMap,
   roleLabelMap,
@@ -75,6 +76,7 @@ const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const { user } = useAuthStore();
 
   const handleCreate = async (values: any) => {
     setLoading(true);
@@ -83,7 +85,9 @@ const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
         groupId,
         values.title,
         values.description || '',
-        values.assigned_to,
+        'user',
+        user?.id || '',
+        values.assigned_to ? [values.assigned_to] : [],
         values.priority || 'medium'
       );
       message.success('Session 创建成功');

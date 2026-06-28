@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt, JWTError
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,22 +7,8 @@ import uuid
 
 from app.database import get_db
 from app.models.models import Agent
-from app.security import rate_limit, sanitize_command_arg
+from app.security import get_current_user_id, get_current_actor, rate_limit, sanitize_command_arg
 from app.config import settings
-
-bearer_scheme = HTTPBearer(auto_error=False)
-
-async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> str | None:
-    """Extract user_id from JWT token. Returns None if not authenticated."""
-    if not credentials:
-        return None
-    try:
-        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        if payload.get("type") != "access":
-            return None
-        return payload.get("sub")
-    except (JWTError, Exception):
-        return None
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -34,6 +18,12 @@ class AgentRegisterRequest(BaseModel):
     skills: list[str] | None = None
     mcp_endpoints: list[str] | None = None
     callback_url: str = Field("", max_length=255)
+
+class AgentUpdateRequest(BaseModel):
+    agent_role: Optional[str] = Field(None, pattern=r"^(arbiter|reviewer|analyst|executor|observer)$")
+    tier: Optional[int] = Field(None, ge=1, le=3)
+    reliability_score: Optional[float] = Field(None, ge=0.0, le=1.0)
+    description: Optional[str] = Field(None, max_length=1000)
 
 class MeByTokenRequest(BaseModel):
     token: str = Field(..., min_length=10)
@@ -46,13 +36,9 @@ class CreateTokenRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
 
 @router.post("/create-token")
-async def create_agent_token(req: CreateTokenRequest, request: Request, db: AsyncSession = Depends(get_db), user_id: str | None = Depends(get_current_user_id)):
+async def create_agent_token(req: CreateTokenRequest, request: Request, uid: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     # Rate limit: 10 token creations per minute per IP
     await rate_limit(request, limit=10, window=60)
-
-    # Require user authentication
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Login required to create agent")
 
     agent_id = str(uuid.uuid4())
     api_key = f"abk_{uuid.uuid4().hex[:32]}"
@@ -61,7 +47,7 @@ async def create_agent_token(req: CreateTokenRequest, request: Request, db: Asyn
         id=agent_id,
         name=req.name,
         api_key=api_key,
-        owner_id=user_id,
+        owner_id=uid,
         status="pending",
         skills=[],
         mcp_endpoints=[],
@@ -140,12 +126,11 @@ async def register_agent(req: AgentRegisterRequest, request: Request, db: AsyncS
 @router.get("/")
 async def list_agents(
     status: Optional[str] = None,
+    uid: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
-    user_id: str | None = Depends(get_current_user_id),
 ):
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Login required")
-    query = select(Agent).where(Agent.is_active == True, Agent.owner_id == user_id)
+    # 强制鉴权，仅返回当前用户拥有的 Agent
+    query = select(Agent).where(Agent.is_active == True, Agent.owner_id == uid)
     if status:
         # Validate status to prevent injection
         if status not in ("online", "offline", "busy", "pending"):
@@ -164,7 +149,7 @@ async def list_agents(
     } for a in agents]
 
 @router.get("/available")
-async def list_available_agents(db: AsyncSession = Depends(get_db)):
+async def list_available_agents(uid: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     """列出所有活跃的Agent，供下拉选择使用（不返回敏感信息）"""
     result = await db.execute(
         select(Agent).where(Agent.is_active == True)
@@ -191,12 +176,63 @@ async def get_agent_by_token(req: MeByTokenRequest, db: AsyncSession = Depends(g
         "status": agent.status,
     }
 
-@router.get("/{agent_id}")
-async def get_agent(agent_id: str, db: AsyncSession = Depends(get_db)):
+@router.put("/{agent_id}")
+async def update_agent_info(
+    agent_id: str,
+    req: AgentUpdateRequest,
+    request: Request,
+    actor: tuple[str, str] = Depends(get_current_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update agent role, tier, reliability_score. Only the agent itself or owner can update."""
+    actor_id, actor_type = actor
+
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Only agent itself or owner can update
+    if actor_type == "agent" and actor_id != agent_id:
+        raise HTTPException(status_code=403, detail="Only the agent itself can update")
+    if actor_type == "user" and agent.owner_id != actor_id:
+        raise HTTPException(status_code=403, detail="Only the owner can update")
+
+    if req.agent_role is not None:
+        agent.agent_role = req.agent_role
+    if req.tier is not None:
+        agent.tier = req.tier
+    if req.reliability_score is not None:
+        agent.reliability_score = req.reliability_score
+    if req.description is not None:
+        agent.description = req.description
+
+    await db.commit()
+    await db.refresh(agent)
+
+    return {
+        "id": agent.id,
+        "name": agent.name,
+        "agent_role": agent.agent_role,
+        "tier": agent.tier,
+        "reliability_score": agent.reliability_score,
+        "description": agent.description,
+    }
+
+@router.get("/{agent_id}")
+async def get_agent(agent_id: str, actor: tuple[str, str] = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
+    actor_id, actor_type = actor
+
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Only allow the agent itself or the owner to view
+    if actor_type == "agent" and actor_id != agent_id:
+        raise HTTPException(status_code=403, detail="Only the agent itself can view")
+    if actor_type == "user" and agent.owner_id != actor_id:
+        raise HTTPException(status_code=403, detail="Only the owner can view this agent")
 
     return {
         "id": agent.id,

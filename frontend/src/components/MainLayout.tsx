@@ -7,6 +7,12 @@ import {
   ApartmentOutlined,
   LogoutOutlined,
   UserOutlined,
+  WechatOutlined,
+  ClockCircleOutlined,
+  SafetyCertificateOutlined,
+  AppstoreOutlined,
+  BankOutlined,
+  CheckSquareOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -25,7 +31,15 @@ const MainLayout: React.FC = () => {
     { key: '/', icon: <MessageOutlined />, label: '对话' },
     { key: '/groups', icon: <TeamOutlined />, label: '群组' },
     { key: '/agents', icon: <RobotOutlined />, label: 'Agent' },
+    { key: '/social', icon: <WechatOutlined />, label: '社交' },
     { key: '/workflows', icon: <ApartmentOutlined />, label: '工作流' },
+    { key: '/scheduled', icon: <ClockCircleOutlined />, label: '定时任务' },
+    { key: '/tasks', icon: <CheckSquareOutlined />, label: '任务管理' },
+    { key: '/parliament', icon: <BankOutlined />, label: '议会' },
+    { key: '/audit', icon: <SafetyCertificateOutlined />, label: '审计日志' },
+    { type: 'divider' as const },
+    { key: '/skills', icon: <AppstoreOutlined />, label: 'Skills 市场' },
+    { key: '/templates', icon: <AppstoreOutlined />, label: '团队模板' },
   ];
 
   const userMenu = {
@@ -57,7 +71,7 @@ const MainLayout: React.FC = () => {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[location.pathname === '/' ? '/' : location.pathname.split('/')[1] ? '/' + location.pathname.split('/')[1] : location.pathname]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderRight: 0 }}
