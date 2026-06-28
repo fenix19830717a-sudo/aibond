@@ -1,187 +1,186 @@
-# aibond — 企业级人机协同平台
+<p align="center">
+  <h1 align="center">馃 aibond</h1>
+  <p align="center"><strong>浼佷笟绾т汉鏈哄崗鍚屽钩鍙?/strong> 鈥?璁?AI Agent 鍍忓洟闃熶竴鏍峰崗浣?/p>
+</p>
 
-> 多 Agent 协作、MCP 组网、Workflow 编排、Parliament 议会决策
-
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python)](https://python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react)](https://react.dev/)
-[![MCP](https://img.shields.io/badge/MCP-2024--11--05-blue)](https://modelcontextprotocol.io/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+<p align="center">
+  <a href="https://python.org/"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white" alt="Python"></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=white" alt="React"></a>
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-2024--11--05-6E3FF3?logo=protocolsdotio&logoColor=white" alt="MCP"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-brightgreen" alt="License"></a>
+  <a href="https://github.com/fenix19830717a-sudo/aibond/releases"><img src="https://img.shields.io/github/v/release/fenix19830717a-sudo/aibond?color=blue" alt="Release"></a>
+</p>
 
 ---
 
-## 架构概览
+## 馃挕 涓轰粈涔堥€夋嫨 aibond锛?
+褰撲粖 AI 搴旂敤涓嶅啀鏄竴涓ā鍨嬪崟鎵撶嫭鏂?鈥斺€?澶嶆潅鐨勪笟鍔″満鏅渶瑕?*澶氫釜 Agent 鍒嗗伐鍗忎綔**銆?*宸ヤ綔娴佽嚜鍔ㄥ寲缂栨帓**銆?*缁撴瀯鍖栭泦浣撳喅绛?*銆?
+aibond 鏄竴涓紑绠卞嵆鐢ㄧ殑**浜烘満鍗忓悓鎿嶄綔绯荤粺**锛屽畠鎶?MCP 鍗忚銆乄orkflow 寮曟搸銆丳arliament 璁細鍐崇瓥铻嶅悎鍒颁竴涓钩鍙颁腑锛岃 AI Agent 鍍忎汉绫诲洟闃熶竴鏍烽珮鏁堝崗浣溿€?
+| 浼犵粺鏂瑰紡 | aibond 鏂瑰紡 |
+|----------|-------------|
+| 姣忎釜 Agent 鐙珛杩愯锛屽宀涘紡绠＄悊 | 缁熶竴骞冲彴锛孉gent 鍗虫彃鍗崇敤锛岃兘鍔涜嚜鍔ㄥ彂鐜?|
+| 纭紪鐮佷换鍔＄紪鎺掞紝淇敼鎴愭湰楂?| 鍙鍖?Workflow + 12 涓缃ā鏉匡紝鎷栨嫿鍗崇敤 |
+| 鍗?Agent 鍐崇瓥锛岀己涔忎氦鍙夐獙璇?| 5 瑙掕壊璁細鎶曠エ锛屽姞鏉冨叡璇嗭紝鍐崇瓥鍙拷婧?|
+| 鍚勭郴缁熷崗璁笉缁熶竴锛岄泦鎴愬洶闅?| 鍘熺敓 MCP 鍗忚锛孋laude / Trae 鐩存帴鎺ュ叆 |
+
+---
+
+## 馃彈锔?鏋舵瀯鍏ㄦ櫙
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                    aibond Platform                     │
-│                                                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │
-│  │  Agent   │  │ Workflow │  │     Parliament        │ │
-│  │  Manager │  │  Engine  │  │  (多Agent议会决策)     │ │
-│  └────┬─────┘  └────┬─────┘  └──────────┬───────────┘ │
-│       │              │                   │             │
-│  ┌────┴──────────────┴───────────────────┴───────────┐ │
-│  │              MCP 组网层 (Model Context Protocol)    │ │
-│  │   Registry │ Client │ Server │ Transport (stdio/SSE/WS) │
-│  └────────────────────────────────────────────────────┘ │
-│                         │                               │
-│  ┌──────────────────────┴──────────────────────────────┐│
-│  │  WebSocket Hub │ REST API │ JWT Auth │ Rate Limit   ││
-│  └─────────────────────────────────────────────────────┘│
-└──────────────────────────────────────────────────────┘
-```
+                      鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                      鈹?    Claude Desktop / Trae      鈹?                      鈹?        澶栭儴 MCP Client         鈹?                      鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                                     鈹? SSE / JSON-RPC
+                                     鈻?鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?                       aibond Platform                         鈹?鈹?                                                               鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?鈹? 鈹? 馃 Agent    鈹? 鈹? 鈿?Workflow 鈹? 鈹? 馃彌锔? Parliament      鈹?鈹?鈹? 鈹? Manager     鈹? 鈹? Engine      鈹? 鈹? 璁細鍐崇瓥寮曟搸         鈹?鈹?鈹? 鈹?             鈹? 鈹?             鈹? 鈹?                     鈹?鈹?鈹? 鈹? WebSocket   鈹? 鈹? 8 绉嶈妭鐐?   鈹? 鈹? 5 瑙掕壊 路 鍔犳潈鎶曠エ   鈹?鈹?鈹? 鈹? 鍙岃璇?     鈹? 鈹? 12 棰勭疆妯℃澘 鈹? 鈹? 浜ゅ弶楠岃瘉 路 缃俊搴?  鈹?鈹?鈹? 鈹? 绂荤嚎娑堟伅    鈹? 鈹? NL Cron     鈹? 鈹? 鎻愭 鈫?鍏辫瘑 鈫?鎵ц  鈹?鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?鈹?        鈹?                鈹?                     鈹?            鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹粹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹粹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹粹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?鈹? 鈹?             馃寪 MCP 缁勭綉灞?(Model Context Protocol)         鈹?鈹?鈹? 鈹?                                                            鈹?鈹?鈹? 鈹? Protocol 鈼?Transport 鈼?Client 鈼?Registry 鈼?Server        鈹?鈹?鈹? 鈹? JSON-RPC    stdio      杩炴帴姹?   鍊掓帓绱㈠紩   5 骞冲彴宸ュ叿     鈹?鈹?鈹? 鈹? 2.0         SSE/WS     鍏ㄧ敓鍛藉懆鏈?宸ュ叿鍙戠幇   鑳藉姏鑱氬悎      鈹?鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?鈹?                               鈹?                                鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹粹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹愨攤
+鈹? 鈹? 馃攼 WebSocket Hub 鈹?REST API 鈹?JWT Auth 鈹?CSP/HSTS 鈹?Audit  鈹傗攤
+鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹樷攤
+鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
 
-## 核心特性
+---
 
-### Agent 管理
-- WebSocket 长连接，支持 Agent 实时双向通信
-- 双认证体系：用户 JWT + Agent API Key (`abk_xxx`)
-- 动态能力注册：Agent 连接后自动声明 skills、工具、资源
-- 离线消息投递：Agent 离线期间消息不丢失
+## 鉁?鏍稿績浜偣
 
-### MCP 组网 (v1.3.0)
-- 完整实现 JSON-RPC 2.0 协议，兼容 MCP 2024-11-05 规范
-- 3 种传输层：`stdio`（本地进程）、`SSE`（远程 HTTP 长连接）、`WebSocket`（aibond 扩展）
-- 统一能力注册中心：Tools/Resources/Prompts 倒排索引
-- 平台作为 MCP Server：对外暴露 5 个平台工具 + 聚合所有 Agent 能力
-- 外部 MCP Client（Claude Desktop / Trae IDE）可直接连接
+<table>
+<tr>
+<td width="50%">
 
-### Workflow 引擎
-- 8 种节点类型：`trigger` / `ai` / `human_review` / `condition` / `output` / `parallel` / `webhook` / `event_watcher`
-- 12 个预置模板（Hermes 5 层架构：定时任务 → 智能监控 → 任务执行 → 多Agent协作 → 持续进化）
-- 自然语言 Cron 解析器（"每天早上8点" → `0 8 * * *`）
-- Kanban 可视化任务调度
+### 馃 澶?Agent 鍗忎綔
+- **WebSocket 闀胯繛鎺?*锛屽疄鏃跺弻鍚戦€氫俊
+- **鍙岃璇佷綋绯?*锛欽WT + Agent API Key
+- **鍔ㄦ€佽兘鍔涙敞鍐?*锛欰gent 涓婄嚎鑷姩澹版槑鎶€鑳?- **绂荤嚎娑堟伅鎶曢€?*锛氭秷鎭笉涓㈠け锛岄噸杩炶嚜鍔ㄨˉ鍙?
+</td>
+<td width="50%">
 
-### Parliament 议会决策
-- 5 角色架构：Arbiter / Reviewer / Analyst / Executor / Observer
-- 加权投票、交叉验证、置信度升级、分级模型路由
-- 提案 → 审议 → 投票 → 共识 → 执行，全流程自动化
+### 馃寪 MCP 鏍囧噯缁勭綉
+- **瀹屾暣 JSON-RPC 2.0**锛屽吋瀹?MCP 2024-11-05
+- **3 绉嶄紶杈撳眰**锛歴tdio 路 SSE 路 WebSocket
+- **鍊掓帓绱㈠紩**锛歍ools / Resources / Prompts
+- **Claude Desktop / Trae IDE 鐩存帴鎺ュ叆**
 
-### 安全体系
-- JWT 双令牌（Access 15min + Refresh 7天）
-- CSP / HSTS 安全头
-- 登录锁定 + 速率限制
-- 全端点鉴权（`get_current_actor` 双认证）
-- 审计日志（所有关键操作）
+</td>
+</tr>
+<tr>
+<td width="50%">
 
-## 快速开始
+### 鈿?Workflow 寮曟搸
+- **8 绉嶈妭鐐?*锛歵rigger 路 ai 路 human_review 路 condition 路 output 路 parallel 路 webhook 路 event_watcher
+- **12 涓缃ā鏉?*锛岃鐩?Hermes 5 灞傛灦鏋?- **鑷劧璇█ Cron**锛?姣忓ぉ鏃╀笂8鐐? 鈫?`0 8 * * *`
+- **Kanban 鐪嬫澘**锛屽彲瑙嗗寲浠诲姟璋冨害
 
-### 环境要求
-- Python 3.10+
-- Node.js 20+
-- SQLite（开发）/ PostgreSQL（生产）
+</td>
+<td width="50%">
 
-### 后端启动
+### 馃彌锔?Parliament 璁細
+- **5 瑙掕壊鏋舵瀯**锛欰rbiter 路 Reviewer 路 Analyst 路 Executor 路 Observer
+- **鍔犳潈鎶曠エ + 浜ゅ弶楠岃瘉 + 缃俊搴﹀崌绾?*
+- **鎻愭 鈫?瀹¤ 鈫?鎶曠エ 鈫?鍏辫瘑 鈫?鎵ц**
+- 鍏ㄦ祦绋嬭嚜鍔ㄥ寲锛屽喅绛栧彲杩芥函
 
+</td>
+</tr>
+</table>
+
+---
+
+## 馃殌 30 绉掑揩閫熶綋楠?
 ```bash
-cd backend
-pip install -r requirements.txt
-python run.py
-# 启动后访问 http://localhost:8100
+# 1. 鍏嬮殕浠撳簱
+git clone https://github.com/fenix19830717a-sudo/aibond.git
+cd aibond
+
+# 2. 鍚姩鍚庣
+cd backend && pip install -r requirements.txt && python run.py
+# 鈫?http://localhost:8100
+
+# 3. 鍚姩鍓嶇锛堟柊缁堢锛?cd frontend && npm install && npm run dev
+# 鈫?http://localhost:5173
 ```
 
-### 前端启动
-
-```bash
-cd frontend
-npm install
-npm run dev
-# 启动后访问 http://localhost:5173
+**鎺ュ叆 Claude Desktop**锛? 琛岄厤缃級锛?```json
+{ "mcpServers": { "aibond": { "url": "http://localhost:8100/api/mcp/sse" } } }
 ```
 
-### Agent SDK
+---
 
-```bash
-pip install aibond-agent
-```
-
-```python
-from aibond_agent import AgentClient
-
-client = AgentClient(
-    server_url="ws://localhost:8100/ws",
-    api_key="your-api-key"
-)
-client.connect()
-```
-
-## 项目结构
+## 馃摝 椤圭洰缁撴瀯
 
 ```
 aibond/
-├── backend/                  # FastAPI 后端
-│   └── app/
-│       ├── mcp/              # MCP 组网模块
-│       │   ├── protocol.py   #   JSON-RPC 2.0 协议
-│       │   ├── transport.py  #   stdio/SSE/WebSocket 传输
-│       │   ├── client.py     #   MCP 客户端
-│       │   ├── registry.py   #   能力注册中心
-│       │   └── server.py     #   MCP 服务端
-│       ├── parliament/       # 议会决策引擎
-│       ├── workflows/        # Workflow 引擎
-│       │   ├── engine.py     #   8 节点执行引擎
-│       │   ├── nl_cron.py    #   自然语言 Cron 解析
-│       │   └── templates.py  #   12 预置模板
-│       ├── websocket/        # WebSocket 通信
-│       ├── routers/          # 17 个路由模块
-│       ├── models/           # 数据模型
-│       └── security.py       # 安全模块
-├── frontend/                 # React 19 前端
-│   └── src/
-│       ├── pages/            # 页面组件
-│       ├── api/              # API 客户端
-│       └── components/       # 通用组件
-├── aibond-agent/             # Agent SDK (Python)
-└── docs/                     # 设计文档
+鈹溾攢鈹€ backend/app/
+鈹?  鈹溾攢鈹€ mcp/                    # 馃寪 MCP 缁勭綉妯″潡
+鈹?  鈹?  鈹溾攢鈹€ protocol.py         #    JSON-RPC 2.0 鍗忚灞?鈹?  鈹?  鈹溾攢鈹€ transport.py        #    stdio / SSE / WebSocket
+鈹?  鈹?  鈹溾攢鈹€ client.py           #    MCP 瀹㈡埛绔繛鎺ユ睜
+鈹?  鈹?  鈹溾攢鈹€ registry.py         #    鑳藉姏娉ㄥ唽涓績锛堝€掓帓绱㈠紩锛?鈹?  鈹?  鈹斺攢鈹€ server.py           #    骞冲彴 MCP Server锛? 宸ュ叿锛?鈹?  鈹溾攢鈹€ parliament/             # 馃彌锔?璁細鍐崇瓥寮曟搸
+鈹?  鈹?  鈹斺攢鈹€ engine.py           #    5 瑙掕壊 路 鍔犳潈鎶曠エ 路 鍏辫瘑
+鈹?  鈹溾攢鈹€ workflows/              # 鈿?Workflow 寮曟搸
+鈹?  鈹?  鈹溾攢鈹€ engine.py           #    8 鑺傜偣鎵ц寮曟搸
+鈹?  鈹?  鈹溾攢鈹€ nl_cron.py          #    鑷劧璇█ 鈫?Cron 琛ㄨ揪寮?鈹?  鈹?  鈹斺攢鈹€ templates.py        #    12 涓缃ā鏉?鈹?  鈹溾攢鈹€ websocket/              # 馃敆 WebSocket 閫氫俊
+鈹?  鈹溾攢鈹€ routers/                # 馃摗 17 涓矾鐢辨ā鍧?鈹?  鈹溾攢鈹€ models/                 # 馃梽锔?鏁版嵁妯″瀷
+鈹?  鈹斺攢鈹€ security.py             # 馃攼 JWT / CSP / HSTS / 瀹¤
+鈹溾攢鈹€ frontend/src/               # 馃帹 React 19 + Ant Design 5
+鈹?  鈹溾攢鈹€ pages/                  #    14 涓〉闈㈢粍浠?鈹?  鈹溾攢鈹€ components/             #    閫氱敤 UI 缁勪欢
+鈹?  鈹斺攢鈹€ api/                    #    API 瀹㈡埛绔?鈹溾攢鈹€ aibond-agent/               # 馃摝 Agent SDK (Python)
+鈹溾攢鈹€ mcp-skill/                  # 馃幆 MCP Registry 鍙戝竷鍖?鈹溾攢鈹€ trae-skill/                 # 馃洜锔?Trae / Agent Skills 鎶€鑳?鈹斺攢鈹€ .claude-plugin/             # 馃攲 Claude Plugin 甯傚満
 ```
 
-## MCP 组网 API
+---
 
-| 端点 | 方法 | 说明 |
+## 馃攲 MCP 缁勭綉 API
+
+| 绔偣 | 鏂规硶 | 鍔熻兘 |
 |------|------|------|
-| `/api/mcp/message` | POST | JSON-RPC 消息处理 |
-| `/api/mcp/sse` | GET | SSE 事件流 |
-| `/api/mcp/discovery` | GET | 服务发现 |
-| `/api/mcp/register-tools` | POST | Agent 注册能力 |
-| `/api/mcp/search-tools` | POST | 跨 Agent 工具搜索 |
-| `/api/mcp/call-tool` | POST | 代理工具调用 |
-| `/api/hub/mcp/discovery` | GET | Hub MCP 发现 |
+| `/api/mcp/message` | POST | JSON-RPC 娑堟伅澶勭悊 |
+| `/api/mcp/sse` | GET | SSE 浜嬩欢娴?|
+| `/api/mcp/discovery` | GET | 鏈嶅姟鍙戠幇锛堟墍鏈?Agent 鑳藉姏锛?|
+| `/api/mcp/register-tools` | POST | Agent 娉ㄥ唽鑳藉姏 |
+| `/api/mcp/search-tools` | POST | 璺?Agent 宸ュ叿鎼滅储 |
+| `/api/mcp/call-tool` | POST | 浠ｇ悊宸ュ叿璋冪敤 |
+| `/api/mcp/agents/{id}/manifest` | GET | Agent 鑳藉姏娓呭崟 |
+| `/api/mcp/connect` | POST | 寤虹珛 MCP 杩炴帴 |
+| `/api/hub/mcp/discovery` | GET | Hub MCP 鍙戠幇 |
 
-### 外部 MCP Client 配置示例
+### 骞冲彴鍐呯疆宸ュ叿
 
-```json
-{
-  "mcpServers": {
-    "aibond": {
-      "url": "https://aib2b.bond/api/mcp/sse"
-    }
-  }
-}
-```
-
-## 技术栈
-
-| 层级 | 技术 |
+| 宸ュ叿 | 璇存槑 |
 |------|------|
-| 后端框架 | FastAPI 0.115 + Uvicorn |
-| 数据库 | SQLAlchemy 2.0 + SQLite / PostgreSQL |
-| 认证 | JWT (HS256) + bcrypt |
-| 实时通信 | WebSocket (websockets 12.0) |
-| 前端框架 | React 19.2 + TypeScript |
-| UI 组件 | Ant Design 5 |
-| 构建工具 | Vite |
-| 协议 | MCP 2024-11-05 (JSON-RPC 2.0) |
+| `aibond.list_agents` | 鍒楀嚭鎵€鏈?Agent 鍙婅兘鍔?|
+| `aibond.run_workflow` | 瑙﹀彂宸ヤ綔娴佹墽琛?|
+| `aibond.create_task` | 鍒涘缓骞跺垎閰嶄换鍔?|
+| `aibond.search_tools` | 璺?Agent 鎼滅储宸ュ叿 |
+| `aibond.call_agent_tool` | 璋冪敤鎸囧畾 Agent 宸ュ叿 |
 
-## 版本历史
+---
 
-| 版本 | 日期 | 关键更新 |
-|------|------|----------|
-| v1.3.0 | 2026-06 | MCP 组网、Hermes Workflow、NL Cron、Parliament 议会 |
-| v1.2.0 | 2026-05 | 安全加固（CSP/HSTS、JWT 刷新、审计日志） |
-| v1.1.0 | 2026-04 | Agent 对话、团队协作、Workflow 引擎 |
-| v1.0.0 | 2026-03 | 基础平台：Auth、Agent、Group、Message |
+## 馃洜锔?鎶€鏈爤
 
-## 许可证
+| 灞傜骇 | 鎶€鏈€夊瀷 |
+|------|----------|
+| 鍚庣妗嗘灦 | **FastAPI 0.115** + Uvicorn |
+| 鏁版嵁搴?| **SQLAlchemy 2.0** + SQLite / PostgreSQL |
+| 璁よ瘉 | **JWT锛圚S256锛?* + bcrypt + 鍙屼护鐗屽埛鏂?|
+| 瀹炴椂閫氫俊 | **WebSocket**锛坵ebsockets 12.0锛?|
+| 鍓嶇妗嗘灦 | **React 19.2** + TypeScript |
+| UI 缁勪欢 | **Ant Design 5** |
+| 鏋勫缓宸ュ叿 | **Vite** |
+| 缁勭綉鍗忚 | **MCP 2024-11-05**锛圝SON-RPC 2.0锛?|
 
-[MIT](LICENSE) License
+---
+
+## 馃椇锔?璺嚎鍥?
+- [x] Agent 绠＄悊涓?WebSocket 閫氫俊
+- [x] MCP 鏍囧噯缁勭綉锛圝SON-RPC 2.0 + 3 浼犺緭灞傦級
+- [x] Workflow 寮曟搸锛? 鑺傜偣 + 12 妯℃澘 + NL Cron锛?- [x] Parliament 璁細鍐崇瓥锛? 瑙掕壊 + 鍔犳潈鎶曠エ锛?- [x] 瀹夊叏浣撶郴锛圝WT 鍙屼护鐗?+ CSP/HSTS + 瀹¤鏃ュ織锛?- [x] MCP Registry 鍙戝竷鍖?- [x] Trae / Agent Skills 鎶€鑳藉寘
+- [ ] OAuth2 绗笁鏂圭櫥褰?- [ ] 澶氱鎴锋敮鎸?- [ ] 鍒嗗竷寮忛儴缃诧紙Kubernetes锛?- [ ] 鍙鍖?Workflow 鎷栨嫿缂栬緫鍣?
+---
+
+## 馃 璐＄尞
+
+娆㈣繋鎻愪氦 Issue 鍜?Pull Request锛?
+- 馃悰 [鎶ュ憡 Bug](https://github.com/fenix19830717a-sudo/aibond/issues)
+- 馃挕 [鍔熻兘寤鸿](https://github.com/fenix19830717a-sudo/aibond/discussions)
+- 馃摉 [瀹屾暣鏂囨。](https://github.com/fenix19830717a-sudo/aibond/wiki)
+
+---
+
+<p align="center">
+  <sub>Built with 鉂わ笍 by <a href="https://github.com/fenix19830717a-sudo">fenix19830717a-sudo</a> 路 <a href="LICENSE">MIT License</a></sub>
+</p>
