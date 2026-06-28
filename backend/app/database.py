@@ -87,6 +87,15 @@ async def _migrate_db():
         "ALTER TABLE agents ADD COLUMN resource_schemas TEXT DEFAULT '[]'",
         "ALTER TABLE agents ADD COLUMN mcp_transport VARCHAR(20) DEFAULT 'websocket'",
 
+        # CLI Adapter columns (v1.4.0 - Trinity Lite integration)
+        "ALTER TABLE agents ADD COLUMN adapter_mode VARCHAR(20) DEFAULT 'websocket'",
+        "ALTER TABLE agents ADD COLUMN adapter_command TEXT DEFAULT '[]'",
+        "ALTER TABLE agents ADD COLUMN adapter_timeout INTEGER DEFAULT 1800",
+        "ALTER TABLE agents ADD COLUMN adapter_cwd VARCHAR(255) DEFAULT ''",
+        "ALTER TABLE agents ADD COLUMN adapter_env TEXT DEFAULT '{}'",
+        "ALTER TABLE agents ADD COLUMN model_tier VARCHAR(20) DEFAULT 'standard'",
+        "ALTER TABLE agents ADD COLUMN model_strengths TEXT DEFAULT '[]'",
+
         # AuditLog indexes
         "CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id)",
         "CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)",

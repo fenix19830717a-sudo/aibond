@@ -49,6 +49,15 @@ class Agent(Base):
         "accepts_polling": False
     })
 
+    # CLI Adapter 模式 (v1.4.0 - Trinity Lite 集成)
+    adapter_mode = Column(String(20), default="websocket")  # websocket | command | mock
+    adapter_command = Column(JSON, default=list)  # CLI 命令数组
+    adapter_timeout = Column(Integer, default=1800)  # 超时秒数
+    adapter_cwd = Column(String(255), default="")  # 工作目录
+    adapter_env = Column(JSON, default=dict)  # 环境变量
+    model_tier = Column(String(20), default="standard")  # budget | standard | premium
+    model_strengths = Column(JSON, default=list)  # 模型优势标签
+
     # Status
     status = Column(String(20), default="offline")  # online, offline, busy
     last_heartbeat = Column(DateTime, default=None)

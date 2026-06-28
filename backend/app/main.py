@@ -8,7 +8,7 @@ import jwt
 
 from app.config import settings
 from app.database import init_db
-from app.routers import auth, agents, groups, messages, workflows, sessions, files, offline, audit, social, templates, scheduled_tasks, tasks, resources, reviews, hub, parliament, mcp_router
+from app.routers import auth, agents, groups, messages, workflows, sessions, files, offline, audit, social, templates, scheduled_tasks, tasks, resources, reviews, hub, parliament, mcp_router, cli_adapter
 from app.websocket.manager import ws_manager
 from app.websocket.agent_handler import handle_agent_websocket
 from app.tunnel import TunnelManager
@@ -124,6 +124,7 @@ app.include_router(reviews.router)
 app.include_router(hub.router)
 app.include_router(parliament.router)
 app.include_router(mcp_router.router)
+app.include_router(cli_adapter.router)
 
 @app.get("/api/health")
 async def health():
