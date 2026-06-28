@@ -54,3 +54,4 @@ aib2b_probe_report.txt
 *.pyc
 .mypy_cache/
 .ruff_cache/
+mcp-publisher*
