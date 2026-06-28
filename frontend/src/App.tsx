@@ -21,6 +21,7 @@ const Tasks = lazy(() => import('./pages/Tasks'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
 const SkillsMarket = lazy(() => import('./pages/SkillsMarket'));
 const TeamTemplates = lazy(() => import('./pages/TeamTemplates'));
+const CliAgents = lazy(() => import('./pages/CliAgents'));
 
 const PageLoader = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -60,6 +61,7 @@ const App: React.FC = () => {
             <Route path="audit" element={<Suspense fallback={<PageLoader />}><AuditLog /></Suspense>} />
             <Route path="skills" element={<Suspense fallback={<PageLoader />}><SkillsMarket /></Suspense>} />
             <Route path="templates" element={<Suspense fallback={<PageLoader />}><TeamTemplates /></Suspense>} />
+            <Route path="cli-agents" element={<Suspense fallback={<PageLoader />}><CliAgents /></Suspense>} />
           </Route>
         </Routes>
       </BrowserRouter>

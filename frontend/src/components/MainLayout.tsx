@@ -13,6 +13,7 @@ import {
   AppstoreOutlined,
   BankOutlined,
   CheckSquareOutlined,
+  CodeOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
@@ -40,6 +41,7 @@ const MainLayout: React.FC = () => {
     { type: 'divider' as const },
     { key: '/skills', icon: <AppstoreOutlined />, label: 'Skills 市场' },
     { key: '/templates', icon: <AppstoreOutlined />, label: '团队模板' },
+    { key: '/cli-agents', icon: <CodeOutlined />, label: 'CLI Agent' },
   ];
 
   const userMenu = {

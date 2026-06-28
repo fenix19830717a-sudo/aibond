@@ -239,4 +239,42 @@ export const api = {
     request('/api/hub/stats'),
   getHubManifest: () =>
     request('/api/hub/manifest'),
+
+  // ===== CLI Adapter API (v1.4.0) =====
+
+  // Agent CLI 配置
+  configureCliAgent: (agentId: string, mode: string, command: string[], timeout: number, cwd: string, env: any, modelTier: string, modelStrengths: string[]) =>
+    request('/api/cli/agents/configure', { method: 'POST', body: JSON.stringify({ agent_id: agentId, mode, command, timeout, cwd, env, model_tier: modelTier, model_strengths: modelStrengths }) }),
+  getCliAgentSpec: (agentId: string) =>
+    request(`/api/cli/agents/${agentId}/spec`),
+
+  // Pull Queue
+  submitCliTask: (targetAgent: string, prompt: string, taskType: string, cwd: string) =>
+    request('/api/cli/tasks/submit', { method: 'POST', body: JSON.stringify({ target_agent: targetAgent, prompt, task_type: taskType, cwd }) }),
+  listCliTasks: (targetAgent?: string, status?: string, limit?: number) =>
+    request(`/api/cli/tasks/${targetAgent ? `?target_agent=${targetAgent}` : ''}${status ? `&status=${status}` : ''}${limit ? `&limit=${limit}` : ''}`),
+  getCliTask: (taskId: string) =>
+    request(`/api/cli/tasks/${taskId}`),
+
+  // Gate 状态机
+  transitionGate: (taskId: string, toStatus: string, acceptanceReason?: string) =>
+    request('/api/cli/gate/transition', { method: 'POST', body: JSON.stringify({ task_id: taskId, to_status: toStatus, acceptance_reason: acceptanceReason }) }),
+  getGateStatus: (taskId: string) =>
+    request(`/api/cli/gate/${taskId}/status`),
+
+  // Agent 消息
+  sendCliMessage: (sourceAgent: string, targetAgent: string, message: string, taskId?: string) =>
+    request('/api/cli/messages/send', { method: 'POST', body: JSON.stringify({ source_agent: sourceAgent, target_agent: targetAgent, message, task_id: taskId }) }),
+  getCliInbox: (agentId: string, unreadOnly?: boolean) =>
+    request(`/api/cli/messages/inbox/${agentId}${unreadOnly ? '?unread_only=true' : ''}`),
+
+  // 模型选择
+  selectModel: (prompt: string, taskType: string, agentId?: string) =>
+    request('/api/cli/model/select', { method: 'POST', body: JSON.stringify({ prompt, task_type: taskType, agent_id: agentId }) }),
+  getCliModelPool: () =>
+    request('/api/cli/model/pool'),
+
+  // 默认规格
+  getCliDefaultSpecs: () =>
+    request('/api/cli/specs/defaults'),
 };
