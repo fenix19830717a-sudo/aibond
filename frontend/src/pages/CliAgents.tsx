@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Tag, Typography, message, Space, Button, Modal, Form,
-  Select, Input, InputNumber, Tabs, Descriptions, Switch, Tooltip,
+  Select, Input, InputNumber, Tabs, Descriptions,
   Badge, Empty, Row, Col, Statistic
 } from 'antd';
 import {
-  CodeOutlined, ReloadOutlined, SettingOutlined, PlayCircleOutlined,
+  CodeOutlined, ReloadOutlined, SettingOutlined,
   SendOutlined, NodeIndexOutlined, ApiOutlined, ThunderboltOutlined,
   CloudServerOutlined, CheckCircleOutlined, CloseCircleOutlined,
   ClockCircleOutlined, SyncOutlined, ExperimentOutlined
