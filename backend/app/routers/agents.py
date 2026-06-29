@@ -167,15 +167,59 @@ async def list_available_agents(uid: str = Depends(get_current_user_id), db: Asy
 
 @router.post("/me")
 async def get_agent_by_token(req: MeByTokenRequest, db: AsyncSession = Depends(get_db)):
-    """Agent 通过 API Key 查询自己的 ID（SDK 连接时使用）"""
+    """Agent 通过 API Key 查询自己的信息和连接方式（SDK 连接时使用）"""
     result = await db.execute(select(Agent).where(Agent.api_key == req.token, Agent.is_active == True))
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found with this token")
+
+    # 构建 WebSocket 连接 URL
+    server_url = settings.PUBLIC_URL.replace("https://", "wss://") if settings.PUBLIC_URL else "ws://localhost:8000"
+    ws_url = f"{server_url}/ws/agent/{agent.id}?api_key={req.token}"
+    http_server_url = settings.PUBLIC_URL if settings.PUBLIC_URL else "http://localhost:8000"
+
+    # 连接指引
+    connection_guide = {
+        "step1": {
+            "title": "已获取身份",
+            "description": f"Agent ID: {agent.id}，当前状态: {agent.status}",
+        },
+        "step2": {
+            "title": "建立 WebSocket 长连接",
+            "description": "必须建立 WebSocket 连接才能使用平台功能",
+            "ws_url": ws_url,
+            "note": "WebSocket 是 Agent 与平台通信的唯一通道。HTTP MCP 端点仅用于工具发现，无法调用工具。",
+        },
+        "step3": {
+            "title": "连接后发送 register 消息注册能力",
+            "description": "连接成功后发送 register 消息注册 skills、mcp_endpoints、capabilities",
+            "example": {
+                "type": "register",
+                "skills": ["code_review", "debugging"],
+                "mcp_endpoints": [],
+                "capabilities": {"accepts_websocket": True}
+            }
+        },
+        "step4": {
+            "title": "保持心跳",
+            "description": "每 15 秒发送 heartbeat 消息保持在线状态",
+            "example": {"type": "heartbeat"}
+        }
+    }
+
     return {
         "id": agent.id,
         "name": agent.name,
         "status": agent.status,
+        "ws_url": ws_url,
+        "server_url": server_url,
+        "http_server_url": http_server_url,
+        "connection_guide": connection_guide,
+        "quick_start": {
+            "cli_command": f"aibond-agent connect --server {server_url} --token {req.token}",
+            "python_sdk": f"from aibond_agent import Client; client = Client(server_url='{server_url}', token='{req.token}'); await client.connect()",
+            "raw_websocket": f"WebSocket 连接地址: {ws_url}\n连接后发送: {{\"type\": \"register\", \"skills\": [...]}}\n保持心跳: 每 15 秒发送 {{\"type\": \"heartbeat\"}}",
+        },
     }
 
 @router.put("/{agent_id}")

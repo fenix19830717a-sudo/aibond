@@ -473,7 +473,13 @@ class AibondMcpServer:
             "aibond_report_progress",
         }
         if tool_name in tools_needing_client and self.client is None:
-            return _tool_error(req_id, "WebSocket not connected. The server is still connecting or the connection failed.")
+            return _tool_error(
+                req_id,
+                f"WebSocket 未连接。请确认:\n"
+                f"1. Agent 已通过 aibond-agent connect --server {self.server} --token {self.token[:8]}... 连接\n"
+                f"2. 或使用 SDK: from aibond_agent import Client; client = Client(server_url='{self.server}', token='{self.token[:8]}...'); await client.connect()\n"
+                f"3. 如果 WebSocket 连接失败，检查服务器是否可达: ping {self.server.replace('https://', '').replace('wss://', '').split('/')[0]}"
+            )
 
         # Execute
         try:

@@ -121,6 +121,43 @@ class MCPServer:
             ),
         )
 
+        # 工具: 注册 Skills（需要 WebSocket 连接）
+        self._platform_tools["aibond.register_skills"] = ToolSchema(
+            name="aibond.register_skills",
+            description="【需要 WebSocket 连接】注册 Agent 的能力 (skills)。请先建立 WebSocket 连接后再调用此工具。",
+            inputSchema=ToolInputSchema(
+                properties={
+                    "skills": {"type": "array", "items": {"type": "string"}, "description": "技能列表，如 ['code_review', 'debugging']"},
+                },
+                required=["skills"],
+            ),
+        )
+
+        # 工具: 发送消息（需要 WebSocket 连接）
+        self._platform_tools["aibond.send_message"] = ToolSchema(
+            name="aibond.send_message",
+            description="【需要 WebSocket 连接】向指定用户或 Agent 发送消息",
+            inputSchema=ToolInputSchema(
+                properties={
+                    "target_id": {"type": "string", "description": "目标 ID"},
+                    "content": {"type": "string", "description": "消息内容"},
+                    "target_type": {"type": "string", "description": "目标类型: user/agent"},
+                },
+                required=["target_id", "content"],
+            ),
+        )
+
+        # 工具: 获取收件箱（需要 WebSocket 连接）
+        self._platform_tools["aibond.fetch_inbox"] = ToolSchema(
+            name="aibond.fetch_inbox",
+            description="【需要 WebSocket 连接】获取 Agent 的消息收件箱",
+            inputSchema=ToolInputSchema(
+                properties={
+                    "unread_only": {"type": "boolean", "description": "是否只获取未读消息"},
+                },
+            ),
+        )
+
     # ---- 消息处理入口 ----
 
     async def handle_message(self, raw_message: dict, session_id: str = "default") -> dict | None:
@@ -353,6 +390,32 @@ class MCPServer:
                 except Exception as e:
                     return {"error": str(e)}
             return {"error": "MCP client not available"}
+
+        elif tool_name == "aibond.register_skills":
+            return {
+                "error": "skills 注册需要通过 WebSocket 连接完成",
+                "help": {
+                    "message": "请在建立 WebSocket 连接后，发送 register 消息来注册 skills",
+                    "steps": [
+                        "1. 建立 WebSocket 连接: wss://aib2b.bond/ws/agent/{agent_id}?api_key={token}",
+                        "2. 发送 register 消息: {\"type\": \"register\", \"skills\": [\"code_review\", \"debugging\"]}",
+                        "3. 保持心跳: 每 15 秒发送 {\"type\": \"heartbeat\"}",
+                    ],
+                    "python_example": "from aibond_agent import Client\nclient = Client(server_url='wss://aib2b.bond', token='{token}')\nawait client.connect()\nawait client.register(skills=['code_review'])",
+                },
+            }
+
+        elif tool_name == "aibond.send_message":
+            return {
+                "error": "消息发送需要通过 WebSocket 连接完成",
+                "help": "请先建立 WebSocket 连接: wss://aib2b.bond/ws/agent/{agent_id}?api_key={token}"
+            }
+
+        elif tool_name == "aibond.fetch_inbox":
+            return {
+                "error": "inbox 需要通过 WebSocket 连接获取",
+                "help": "请先建立 WebSocket 连接，平台会自动推送消息到连接的 Agent"
+            }
 
         return {"error": f"Unknown platform tool: {tool_name}"}
 
