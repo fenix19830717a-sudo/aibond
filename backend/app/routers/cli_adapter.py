@@ -179,6 +179,7 @@ async def submit_task(
 async def worker_pull(
     req: WorkerRunRequest,
     request: Request,
+    actor: tuple[str, str] = Depends(get_current_actor),
 ):
     """Worker 拉取并执行一个任务（CLI 模式）"""
     await rate_limit(request, limit=60, window=60)
@@ -209,6 +210,7 @@ async def list_tasks(
     target_agent: str | None = None,
     status: str | None = None,
     limit: int = 50,
+    actor: tuple[str, str] = Depends(get_current_actor),
 ):
     """列出 Pull Queue 任务"""
     tasks = await global_pull_queue.list_tasks(
@@ -231,7 +233,7 @@ async def list_tasks(
 
 
 @router.get("/tasks/{task_id}")
-async def get_task(task_id: str):
+async def get_task(task_id: str, actor: tuple[str, str] = Depends(get_current_actor)):
     """获取任务详情"""
     task = await global_pull_queue.get_task(task_id)
     if task is None:
@@ -305,7 +307,7 @@ async def transition_gate(
 
 
 @router.get("/gate/{task_id}/status")
-async def get_gate_status(task_id: str):
+async def get_gate_status(task_id: str, actor: tuple[str, str] = Depends(get_current_actor)):
     """获取 Gate 状态"""
     task = await global_pull_queue.get_task(task_id)
     if task is None:
@@ -332,6 +334,7 @@ async def get_gate_status(task_id: str):
 async def send_message(
     req: SendMessageRequest,
     request: Request,
+    actor: tuple[str, str] = Depends(get_current_actor),
 ):
     """发送 Agent 间消息"""
     await rate_limit(request, limit=30, window=60)
@@ -350,6 +353,7 @@ async def get_inbox(
     agent_id: str,
     unread_only: bool = False,
     limit: int = 20,
+    actor: tuple[str, str] = Depends(get_current_actor),
 ):
     """获取 Agent 收件箱"""
     messages = await global_pull_queue.get_inbox(

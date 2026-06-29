@@ -83,6 +83,49 @@ async def create_parliament(
     return result
 
 
+@router.get("/")
+async def list_parliaments(
+    actor: tuple[str, str] = Depends(get_current_actor),
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all parliament sessions with pagination."""
+    from app.models.models import Parliament
+
+    if limit < 1 or limit > 100:
+        limit = 20
+    if offset < 0:
+        offset = 0
+
+    query = select(Parliament)
+    if status:
+        query = query.where(Parliament.status == status)
+    query = query.order_by(Parliament.created_at.desc()).limit(limit).offset(offset)
+
+    result = await db.execute(query)
+    parliaments = result.scalars().all()
+
+    return {
+        "items": [{
+            "id": p.id,
+            "group_id": p.group_id,
+            "title": p.title,
+            "topic": p.topic,
+            "status": p.status,
+            "consensus_type": p.consensus_type,
+            "round_count": p.round_count,
+            "max_rounds": p.max_rounds,
+            "created_by": p.created_by,
+            "created_at": str(p.created_at),
+            "resolved_at": str(p.resolved_at) if p.resolved_at else None,
+        } for p in parliaments],
+        "limit": limit,
+        "offset": offset,
+    }
+
+
 @router.get("/{parliament_id}")
 async def get_parliament(
     parliament_id: str,
@@ -220,10 +263,11 @@ async def submit_proposal(
     """Submit a proposal to the parliament."""
     await rate_limit(request, limit=50, window=60)
 
+    actor_id, actor_type = actor
     engine = ParliamentEngine(db)
     result = await engine.submit_proposal(
         parliament_id=parliament_id,
-        proposer_id=req.proposer_id,
+        proposer_id=actor_id,
         content=req.content,
         confidence=req.confidence,
     )
@@ -245,11 +289,12 @@ async def cast_vote(
     """Cast a vote on a proposal."""
     await rate_limit(request, limit=30, window=60)
 
+    actor_id, actor_type = actor
     engine = ParliamentEngine(db)
     result = await engine.cast_vote(
         parliament_id=parliament_id,
         proposal_id=req.proposal_id,
-        voter_id=req.voter_id,
+        voter_id=actor_id,
         vote=req.vote,
         confidence=req.confidence,
         reasoning=req.reasoning,

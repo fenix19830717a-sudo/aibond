@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
+import hashlib
+import hmac
 
 from app.database import get_db
 from app.models.models import Workflow, WorkflowInstance
@@ -215,6 +217,9 @@ async def webhook_trigger(workflow_id: str, request: Request, db: AsyncSession =
     Accepts any JSON payload from an external webhook and starts the
     workflow identified by workflow_id. The webhook payload is injected
     into the workflow context as `webhook_payload`.
+
+    Security: Requires X-Webhook-Signature header (HMAC-SHA256) matching
+    the workflow's webhook_secret stored in trigger_config.
     """
     # Parse webhook body
     try:
@@ -222,11 +227,34 @@ async def webhook_trigger(workflow_id: str, request: Request, db: AsyncSession =
     except Exception:
         body = {}
 
-    # Verify workflow exists and has webhook trigger type
+    # Verify workflow exists
     result = await db.execute(select(Workflow).where(Workflow.id == workflow_id))
     workflow = result.scalar_one_or_none()
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Verify webhook signature
+    trigger_config = workflow.trigger_config or {}
+    webhook_secret = trigger_config.get("webhook_secret", "")
+    signature = request.headers.get("X-Webhook-Signature", "")
+
+    if not webhook_secret:
+        # No secret configured — reject to prevent unauthorized triggering
+        raise HTTPException(status_code=403, detail="Webhook secret not configured for this workflow")
+
+    if not signature:
+        raise HTTPException(status_code=401, detail="Missing X-Webhook-Signature header")
+
+    # Compute expected HMAC-SHA256 of the raw body
+    raw_body = await request.body()
+    expected_sig = hmac.new(
+        webhook_secret.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(signature, expected_sig):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
     # Execute workflow using the engine
     engine = WorkflowEngine(db)

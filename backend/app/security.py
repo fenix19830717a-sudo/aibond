@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
-from app.models.models import Agent
+from app.models.models import Agent, User
 
 # ── Rate Limiting (in-memory, production use Redis) ──
 _rate_limit_store: dict = {}  # ip -> [(timestamp, count)]
@@ -158,6 +158,27 @@ async def get_current_actor(
             return (agent.id, "agent")
 
     raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+
+async def require_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(security_bearer),
+    db: AsyncSession = Depends(get_db),
+) -> str:
+    """要求管理员权限。返回 user_id，非管理员抛出 403。"""
+    uid = await get_current_user_id(credentials)
+    result = await db.execute(select(User).where(User.id == uid))
+    user = result.scalar_one_or_none()
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return uid
+
+
+async def verify_agent_owner(db: AsyncSession, agent_id: str, uid: str) -> bool:
+    """验证 Agent 归属当前用户。"""
+    result = await db.execute(
+        select(Agent).where(Agent.id == agent_id, Agent.owner_id == uid)
+    )
+    return result.scalar_one_or_none() is not None
 
 
 # ── JWT Refresh Token ──

@@ -71,11 +71,16 @@ class ToolSearchRequest(BaseModel):
 # ============================================================
 
 @router.post("/message")
-async def mcp_message(request: Request):
+async def mcp_message(
+    request: Request,
+    actor: tuple[str, str] = Depends(get_current_actor),
+):
     """MCP JSON-RPC 消息处理端点
 
     外部 MCP Client（如 Claude Desktop、Trae IDE）通过此端点
     发送 JSON-RPC 请求，实现 MCP 协议交互。
+
+    Security: Requires authentication via Bearer token (JWT) or API Key (abk_).
     """
     try:
         body = await request.json()
@@ -336,8 +341,13 @@ async def disconnect_agent(
     agent_id: str,
     request: Request,
     uid: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
     """断开与 Agent 的 MCP 连接"""
+    # Verify agent ownership
+    result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.owner_id == uid))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied: not the agent owner")
     await global_mcp_client.disconnect_agent(agent_id)
     return {"status": "ok", "agent_id": agent_id, "connected": False}
 
@@ -347,9 +357,15 @@ async def discover_agent(
     agent_id: str,
     request: Request,
     uid: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
     """触发 Agent 能力发现流程"""
     await rate_limit(request, limit=10, window=60)
+
+    # Verify agent ownership
+    result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.owner_id == uid))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Access denied: not the agent owner")
 
     try:
         manifest = await global_mcp_client.discover_agent(agent_id)

@@ -12,7 +12,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models.models import AuditLog
-from app.security import get_current_user_id
+from app.security import require_admin
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
@@ -44,7 +44,7 @@ async def write_audit_log(
 
 @router.get("/")
 async def list_audit_logs(
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_admin),
     actor_type: Optional[str] = Query(None, description="过滤 actor_type: user/agent/system"),
     action: Optional[str] = Query(None, description="过滤 action，如 auth.login"),
     limit: int = Query(50, ge=1, le=200),
@@ -76,7 +76,7 @@ async def list_audit_logs(
 
 @router.get("/stats")
 async def audit_stats(
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """操作统计"""
@@ -107,7 +107,7 @@ async def audit_stats(
 
 @router.get("/export.csv")
 async def export_audit_csv(
-    uid: str = Depends(get_current_user_id),
+    uid: str = Depends(require_admin),
     actor_type: Optional[str] = Query(None),
     action: Optional[str] = Query(None),
     limit: int = Query(1000, ge=1, le=5000),

@@ -173,6 +173,10 @@ async def update_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # Verify group membership
+    if not await _verify_group_member(db, task.group_id, uid):
+        raise HTTPException(status_code=403, detail="Not a member of the task's group")
+
     if req.title is not None:
         task.title = sanitize_text(req.title, max_length=200)
     if req.description is not None:
@@ -212,6 +216,13 @@ async def assign_task(
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    # Verify authorization: user must be group member, agent must be task assignee
+    if actor_type == "user":
+        if not await _verify_group_member(db, task.group_id, actor_id):
+            raise HTTPException(status_code=403, detail="Not a member of the task's group")
+    elif actor_type == "agent" and task.assignee_id != actor_id:
+        raise HTTPException(status_code=403, detail="Only the assignee can reassign this task")
 
     task.assignee_type = req.assignee_type
     task.assignee_id = req.assignee_id
@@ -266,6 +277,10 @@ async def review_task(
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    # Verify group membership
+    if not await _verify_group_member(db, task.group_id, uid):
+        raise HTTPException(status_code=403, detail="Not a member of the task's group")
 
     review = Review(
         id=str(uuid.uuid4()),

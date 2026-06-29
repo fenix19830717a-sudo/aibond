@@ -7,12 +7,22 @@ import os
 import shutil
 
 from app.database import get_db
-from app.models.models import File as FileModel, Group, Session as SessionModel
+from app.models.models import File as FileModel, Group, GroupMember, Session as SessionModel, SessionMember
 from app.security import get_current_actor
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+ALLOWED_MIME_TYPES = {
+    "text/plain", "application/json", "application/pdf",
+    "image/png", "image/jpeg", "image/gif", "image/webp",
+    "application/zip", "application/x-tar", "application/gzip",
+    "application/octet-stream", "application/x-python-code",
+    "text/csv", "text/markdown", "application/javascript",
+    "text/html", "text/css", "application/xml",
+}
 
 
 @router.post("/upload")
@@ -31,8 +41,17 @@ async def upload_file(
     storage_name = f"{file_id}{ext}"
     storage_path = os.path.join(UPLOAD_DIR, storage_name)
 
+    # Read content with size limit
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)}MB")
+
+    # Validate MIME type (skip for empty content_type to avoid false rejects)
+    mime_type = file.content_type or ""
+    if mime_type and mime_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=415, detail=f"Unsupported file type: {mime_type}")
+
     with open(storage_path, "wb") as f:
-        content = await file.read()
         f.write(content)
 
     file_record = FileModel(
@@ -92,10 +111,45 @@ async def list_files(
 
 @router.get("/{file_id}")
 async def download_file(file_id: str, actor: tuple[str, str] = Depends(get_current_actor), db: AsyncSession = Depends(get_db)):
+    actor_id, actor_type = actor
     result = await db.execute(select(FileModel).where(FileModel.id == file_id))
     file_record = result.scalar_one_or_none()
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found")
+
+    # Ownership check: uploader OR member of the file's group/session
+    if file_record.uploader_id == actor_id and file_record.uploader_type == actor_type:
+        pass  # Owner can download
+    elif file_record.group_id:
+        # Check group membership
+        if actor_type == "user":
+            member_result = await db.execute(
+                select(GroupMember).where(
+                    GroupMember.group_id == file_record.group_id,
+                    GroupMember.user_id == actor_id,
+                )
+            )
+            if not member_result.scalar_one_or_none():
+                # Also check if user is group owner
+                group_result = await db.execute(select(Group).where(Group.id == file_record.group_id))
+                group = group_result.scalar_one_or_none()
+                if not group or group.owner_id != actor_id:
+                    raise HTTPException(status_code=403, detail="Access denied: not a member of this group")
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif file_record.session_id:
+        # Check session membership
+        member_result = await db.execute(
+            select(SessionMember).where(
+                SessionMember.session_id == file_record.session_id,
+                SessionMember.member_id == actor_id,
+            )
+        )
+        if not member_result.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="Access denied: not a member of this session")
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     return FileResponse(
         path=file_record.storage_path,
         filename=file_record.original_name,
