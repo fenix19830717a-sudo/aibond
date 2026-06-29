@@ -199,6 +199,7 @@ async def _handle_heartbeat(websocket: WebSocket, agent_id: str, data: dict):
         result = await db.execute(select(Agent).where(Agent.id == agent_id))
         agent = result.scalar_one_or_none()
         if agent:
+            agent.status = "online"
             agent.last_heartbeat = datetime.now(timezone.utc)
             if data.get("address"):
                 addr = str(data["address"])[:255]
@@ -213,6 +214,8 @@ async def _handle_register(websocket: WebSocket, agent_id: str, data: dict):
         result = await db.execute(select(Agent).where(Agent.id == agent_id))
         agent = result.scalar_one_or_none()
         if agent:
+            agent.status = "online"
+            agent.last_heartbeat = datetime.now(timezone.utc)
             if data.get("skills"):
                 agent.skills = data["skills"]
             if data.get("mcp_endpoints"):

@@ -59,7 +59,7 @@ class Agent(Base):
     model_strengths = Column(JSON, default=list)  # 模型优势标签
 
     # Status
-    status = Column(String(20), default="offline")  # online, offline, busy
+    status = Column(String(20), default="offline")  # online, offline, busy, pending
     last_heartbeat = Column(DateTime, default=None)
     current_address = Column(String(255), default="")  # current reachable address
 

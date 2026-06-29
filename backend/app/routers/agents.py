@@ -107,6 +107,7 @@ async def register_agent(req: AgentRegisterRequest, request: Request, db: AsyncS
         id=str(uuid.uuid4()),
         name=req.name,
         api_key=api_key,
+        status="pending",
         skills=req.skills or [],
         mcp_endpoints=req.mcp_endpoints or [],
         callback_url=req.callback_url,
