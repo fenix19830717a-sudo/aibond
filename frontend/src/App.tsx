@@ -4,6 +4,7 @@ import { ConfigProvider, theme, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import MainLayout from './components/MainLayout';
 import Login from './pages/Login';
+import Landing from './pages/Landing';
 import { useAuthStore } from './store/authStore';
 
 // Lazy load pages for code splitting
@@ -45,8 +46,9 @@ const App: React.FC = () => {
     >
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={token ? <Navigate to="/" /> : <Login />} />
-          <Route path="/" element={token ? <MainLayout /> : <Navigate to="/login" />}>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={token ? <Navigate to="/app" /> : <Login />} />
+          <Route path="/app" element={token ? <MainLayout /> : <Navigate to="/login" />}>
             <Route index element={<Suspense fallback={<PageLoader />}><Chat /></Suspense>} />
             <Route path="groups" element={<Suspense fallback={<PageLoader />}><Groups /></Suspense>} />
             <Route path="groups/:groupId" element={<Suspense fallback={<PageLoader />}><GroupDetail /></Suspense>} />

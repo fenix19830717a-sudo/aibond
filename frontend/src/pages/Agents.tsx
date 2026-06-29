@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Modal, Form, Input, List, Tag, Typography, message, Space, Badge, Tooltip, Tabs } from 'antd';
-import { PlusOutlined, RobotOutlined, ApiOutlined, HeartOutlined, CopyOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, RobotOutlined, ApiOutlined, HeartOutlined, CopyOutlined, CheckCircleOutlined, ClockCircleOutlined, LinkOutlined, KeyOutlined } from '@ant-design/icons';
 import { api } from '../api';
 
 const { Title, Text, Paragraph } = Typography;
@@ -99,6 +99,9 @@ const Agents: React.FC = () => {
         dataSource={agents}
         renderItem={(agent: any) => {
           const sc = statusConfig[agent.status] || statusConfig.offline;
+          const apiKey = agent.api_key || '';
+          const mcpUrl = `https://aib2b.bond/api/mcp/sse`;
+          const agentLink = `https://aib2b.bond/agent/${agent.id}`;
           return (
             <List.Item>
               <Card
@@ -122,11 +125,61 @@ const Agents: React.FC = () => {
                     {agent.status === 'pending' ? '等待 Agent 连接后自动发现 Skills...' : '暂无 Skills'}
                   </Text>
                 )}
-                <div style={{ marginTop: 8 }}>
+                <div style={{ marginTop: 8, marginBottom: 8 }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     <HeartOutlined /> 最后心跳: {agent.last_heartbeat ? new Date(agent.last_heartbeat).toLocaleString() : '从未'}
                   </Text>
                 </div>
+                {/* 一键复制 */}
+                {apiKey && (
+                  <div style={{
+                    borderTop: '1px solid rgba(255,255,255,0.06)',
+                    paddingTop: 8,
+                    display: 'flex',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}>
+                    <Tooltip title="复制 API Key">
+                      <Button
+                        size="small"
+                        icon={<KeyOutlined />}
+                        onClick={() => {
+                          navigator.clipboard.writeText(apiKey);
+                          message.success('API Key 已复制');
+                        }}
+                        style={{ fontSize: 12 }}
+                      >
+                        复制 API Key
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="复制 MCP 端点 URL">
+                      <Button
+                        size="small"
+                        icon={<LinkOutlined />}
+                        onClick={() => {
+                          navigator.clipboard.writeText(mcpUrl);
+                          message.success('MCP 端点已复制');
+                        }}
+                        style={{ fontSize: 12 }}
+                      >
+                        复制 MCP 端点
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="复制 Agent 连接地址">
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => {
+                          navigator.clipboard.writeText(agentLink);
+                          message.success('Agent 地址已复制');
+                        }}
+                        style={{ fontSize: 12 }}
+                      >
+                        复制连接地址
+                      </Button>
+                    </Tooltip>
+                  </div>
+                )}
               </Card>
             </List.Item>
           );

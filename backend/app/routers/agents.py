@@ -142,6 +142,7 @@ async def list_agents(
     return [{
         "id": a.id,
         "name": a.name,
+        "api_key": a.api_key,
         "status": a.status,
         "skills": a.skills,
         "last_heartbeat": str(a.last_heartbeat) if a.last_heartbeat else None,

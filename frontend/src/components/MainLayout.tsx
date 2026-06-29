@@ -29,19 +29,19 @@ const MainLayout: React.FC = () => {
   const { token: themeToken } = theme.useToken();
 
   const menuItems = [
-    { key: '/', icon: <MessageOutlined />, label: '对话' },
-    { key: '/groups', icon: <TeamOutlined />, label: '群组' },
-    { key: '/agents', icon: <RobotOutlined />, label: 'Agent' },
-    { key: '/social', icon: <WechatOutlined />, label: '社交' },
-    { key: '/workflows', icon: <ApartmentOutlined />, label: '工作流' },
-    { key: '/scheduled', icon: <ClockCircleOutlined />, label: '定时任务' },
-    { key: '/tasks', icon: <CheckSquareOutlined />, label: '任务管理' },
-    { key: '/parliament', icon: <BankOutlined />, label: '议会' },
-    { key: '/audit', icon: <SafetyCertificateOutlined />, label: '审计日志' },
+    { key: '/app', icon: <MessageOutlined />, label: '对话' },
+    { key: '/app/groups', icon: <TeamOutlined />, label: '群组' },
+    { key: '/app/agents', icon: <RobotOutlined />, label: 'Agent' },
+    { key: '/app/social', icon: <WechatOutlined />, label: '社交' },
+    { key: '/app/workflows', icon: <ApartmentOutlined />, label: '工作流' },
+    { key: '/app/scheduled', icon: <ClockCircleOutlined />, label: '定时任务' },
+    { key: '/app/tasks', icon: <CheckSquareOutlined />, label: '任务管理' },
+    { key: '/app/parliament', icon: <BankOutlined />, label: '议会' },
+    { key: '/app/audit', icon: <SafetyCertificateOutlined />, label: '审计日志' },
     { type: 'divider' as const },
-    { key: '/skills', icon: <AppstoreOutlined />, label: 'Skills 市场' },
-    { key: '/templates', icon: <AppstoreOutlined />, label: '团队模板' },
-    { key: '/cli-agents', icon: <CodeOutlined />, label: 'CLI Agent' },
+    { key: '/app/skills', icon: <AppstoreOutlined />, label: 'Skills 市场' },
+    { key: '/app/templates', icon: <AppstoreOutlined />, label: '团队模板' },
+    { key: '/app/cli-agents', icon: <CodeOutlined />, label: 'CLI Agent' },
   ];
 
   const userMenu = {
@@ -73,7 +73,7 @@ const MainLayout: React.FC = () => {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={[location.pathname === '/' ? '/' : location.pathname.split('/')[1] ? '/' + location.pathname.split('/')[1] : location.pathname]}
+          selectedKeys={[location.pathname]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{ borderRight: 0 }}

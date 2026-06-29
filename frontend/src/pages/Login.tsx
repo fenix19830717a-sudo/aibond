@@ -18,7 +18,7 @@ const Login: React.FC = () => {
       const data = await api.login(values.username, values.password);
       setAuth(data.token, data.user);
       message.success('登录成功');
-      navigate('/');
+      navigate('/app');
     } catch (err: any) {
       message.error(err.message || '登录失败');
     } finally {
@@ -54,7 +54,7 @@ const Login: React.FC = () => {
       const data = await api.register(values.username, values.password, values.email);
       setAuth(data.token, data.user);
       message.success('注册成功');
-      navigate('/');
+      navigate('/app');
     } catch (err: any) {
       message.error(err.message || '注册失败');
     } finally {
